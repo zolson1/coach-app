@@ -276,7 +276,7 @@ function liftHTML(b, i) {
   const adj = (b.state.adjustments || []).map((x) => `<p class="adj ${esc(x.level)}">${esc(x.reason)}</p>`).join("");
   return `<section class="card lift" id="blk${i}">
     <div class="lift-head"><h2>${esc(b.label)}</h2>
-      <span class="tm">${b.tm ? `TM ${esc(b.tm)}` : "No TM"}${b.provisional ? ` <i class="badge">provisional</i>` : ""}${b.pct ? ` · ${Math.round(b.pct * 100)}%` : ""} · cap RPE ${esc(b.rpe_cap)}</span></div>
+      <span class="tm">${b.tm ? `TM ${esc(b.tm)}${b.load_mode === "added" ? " total" : ""}` : "No TM"}${b.load_mode === "added" && b.bodyweight ? ` · BW ${esc(b.bodyweight)}` : ""}${b.provisional ? ` <i class="badge">provisional</i>` : ""}${b.pct ? ` · ${Math.round(b.pct * 100)}%` : ""} · cap RPE ${esc(b.rpe_cap)}</span></div>
     ${hist ? `<p class="hist">Last ${esc(hist)}</p>` : ""}
     ${note ? `<p class="hist note">Note (${esc(L.fmtDate(note.date))}): ${esc(note.text)}</p>` : ""}
     ${cuesHTML(b)}

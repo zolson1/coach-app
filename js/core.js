@@ -127,8 +127,11 @@ export function send(ops) {
   flushSoon();
 }
 
+// Each commit starts a sync run on GitHub, so a burst of taps (checking off a
+// morning's meals) waits for a quiet spell and goes out as ONE commit. Leaving
+// the app sends whatever is waiting straight away (app.js, visibilitychange).
 let flushTimer = null;
-export function flushSoon(ms = 1500) {           // batch a burst of taps into one commit
+export function flushSoon(ms = 8000) {
   clearTimeout(flushTimer);
   flushTimer = setTimeout(flushAll, ms);
 }
@@ -168,7 +171,7 @@ export async function flushAll() {
   else if (sentOps) S.syncMsg = null;
   if (sentSessions || sentOps) setTimeout(() => refreshPlan(true), 45000);
   render();
-  if (store.get("ops", []).length && !err) flushSoon(500);
+  if (store.get("ops", []).length && !err) flushSoon();
   pollRequests();
 }
 window.addEventListener("online", flushAll);

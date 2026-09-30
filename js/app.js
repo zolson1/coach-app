@@ -166,7 +166,8 @@ render();
 if (S.active) T.keepAwake(true);
 refreshPlan(!!S.plan).then(() => { flushAll(); pollRequests(); });
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState !== "visible" || !S.settings.token) return;
+  if (!S.settings.token) return;
+  if (document.visibilityState === "hidden") { flushAll(); return; }     // don't leave taps waiting on the phone
   const age = S.plan?.generated ? Date.now() - new Date(S.plan.generated).getTime() : Infinity;
   if (age > 5 * 60 * 1000 || S.plan?.date !== today()) refreshPlan(true);
   flushAll();

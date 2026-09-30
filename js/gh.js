@@ -78,3 +78,36 @@ export async function dispatchDaily(s) {
   await check(res, "Starting the morning run");
   return true;
 }
+
+// Commit any JSON document (creates or replaces) — op batches and requests.
+export async function putJSON(s, path, obj, message) {
+  const body = { message: message || `app ${path}`, content: b64(JSON.stringify(obj, null, 1)), branch: s.branch };
+  const sha = await existingSha(s, path);
+  if (sha) body.sha = sha;
+  const res = await fetch(`${API}/repos/${s.repo}/contents/${path}`, {
+    method: "PUT", headers: headers(s.token, { Accept: "application/vnd.github+json" }),
+    body: JSON.stringify(body),
+  });
+  await check(res, "Saving");
+  return true;
+}
+
+async function raw(s, path) {
+  const res = await fetch(`${API}/repos/${s.repo}/contents/${path}?ref=${s.branch}`, {
+    headers: headers(s.token, { Accept: "application/vnd.github.raw+json" }), cache: "no-store",
+  });
+  if (res.status === 404) return null;
+  await check(res, "Loading");
+  return res;
+}
+
+// A JSON file from the repo, or null if it isn't there yet (a pending answer).
+export async function getJSON(s, path) {
+  const res = await raw(s, path);
+  return res ? res.json() : null;
+}
+
+export async function getText(s, path) {
+  const res = await raw(s, path);
+  return res ? res.text() : null;
+}

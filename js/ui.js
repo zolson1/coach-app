@@ -1,7 +1,7 @@
 // Small pieces every tab uses.
 import { S, A, esc, fuel, send, go, today, L } from "./core.js";
 
-export const LEVEL_NAME = { F1: "Recovery", F2: "Base", F3: "Double", F4: "Double + lift" };
+export const LEVEL_NAME = { F1: "Recovery", F2: "Base", F3: "Double", F4: "Double + PM session" };
 
 export function levelChip(level, extra = "") {
   return `<span class="lvl ${esc(String(level).toLowerCase())}">${esc(level)}${extra ? ` ${esc(extra)}` : ""}</span>`;

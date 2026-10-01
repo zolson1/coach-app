@@ -111,3 +111,15 @@ export async function getText(s, path) {
   const res = await raw(s, path);
   return res ? res.text() : null;
 }
+
+export async function dispatchWorkflow(s, file) {
+  const res = await fetch(`${API}/repos/${s.repo}/actions/workflows/${file}/dispatches`, {
+    method: "POST", headers: headers(s.token, { Accept: "application/vnd.github+json" }),
+    body: JSON.stringify({ ref: s.branch }),
+  });
+  if (res.status === 403 || res.status === 404) {
+    throw new GhError(res.status, `Starting the job: ${res.status} — the app's token needs Actions: Read and write on ${s.repo} (Settings → the token)`);
+  }
+  await check(res, "Starting the job");
+  return true;
+}

@@ -4,6 +4,8 @@ import { S, A, esc, fuel, send, today, fmtNum, pendingCount } from "./core.js";
 import { levelChip, dayOf, statusLine, tasksHTML, macroLine, LEVEL_NAME } from "./ui.js";
 import { dayTotals, nextRow } from "./ops.js";
 import { sessionButton } from "./train.js";
+import { matCard, mobilityCard } from "./mat.js";
+import { fixPending } from "./fix.js";
 
 export function viewToday() {
   const p = S.plan;
@@ -16,9 +18,12 @@ export function viewToday() {
     const lv = d.level, tot = dayTotals(d);
     const r = t?.readiness || {};
     const sleep = r.sleep_last_night_h != null ? `slept ${r.sleep_last_night_h} h` : null;
+    const fixing = fixPending();
     html += `<section class="card dayhead"><div class="lift-head"><h2>${esc(d.weekday)}</h2>${levelChip(lv.today, LEVEL_NAME[lv.today])}</div>
       <p class="big-num">${fmtNum(lv.kcal)} <span>kcal</span> · ${lv.protein}+ <span>g protein</span></p>
-      <p class="muted">${esc([statusLine(d), sleep, r.hrv_state ? `HRV ${r.hrv_state}` : null].filter(Boolean).join(" · "))}</p>
+      <div class="lift-head"><p class="muted">${esc([statusLine(d), sleep ? `${sleep}${r.sleep_source === "reported" ? " (you)" : ""}` : null, r.hrv_state ? `HRV ${r.hrv_state}` : null].filter(Boolean).join(" · "))}</p>
+        <button class="btn sm" data-a="fixsheet">Fix</button></div>
+      ${fixing.length ? `<p class="adj">Fix sent (${esc(fixing.map((o) => o.op === "report_sleep" ? `slept ${o.hours} h` : o.op === "schedule_override" ? `today is ${o.type.toLowerCase()}` : o.op === "neck_sore" ? "neck sore" : "neck fine").join(", "))}) — today rebuilds in about a minute.</p>` : ""}
       ${(lv.why || []).map((w) => `<p class="adj">${esc(w)}</p>`).join("")}
       <div class="meter" title="protein"><i style="width:${Math.min(100, (tot.protein / (f.protein_floor || 200)) * 100)}%"></i></div>
       <p class="muted small">${tot.logged} of ${tot.rows} meals logged · ${tot.protein} of ${f.protein_floor} g protein</p></section>`;
@@ -37,14 +42,14 @@ export function viewToday() {
 
   const sessions = p?.sessions || {};
   const runnable = (t?.sessions || []).filter((k) => sessions[k]);
-  const mat = d?.mat === "double" ? "BJJ 10:30 → Muay Thai 12:00" : d?.mat === "one" ? "One class today" : null;
+  html += matCard(d);
   html += `<section class="card"><h2>Training</h2>
     ${S.active ? `<button class="btn primary big" data-a="resume">Resume ${esc(S.active.spec.title)}</button>` : ""}
-    ${mat ? `<p class="line">${esc(mat)}</p>` : ""}
     ${runnable.map((k) => sessionButton(sessions[k], true)).join("")}
     ${(t?.sessions || []).includes("lic") ? `<p class="line">Zone 2, 45–60 min.</p>` : ""}
-    ${!mat && !runnable.length && !(t?.sessions || []).includes("lic") ? `<p class="muted">Nothing scheduled${t ? "" : " — today's plan arrives with the morning run"}.</p>` : ""}
+    ${!d?.mat_plan && !runnable.length && !(t?.sessions || []).includes("lic") ? `<p class="muted">Nothing scheduled${t ? "" : " — today's plan arrives with the morning run"}.</p>` : ""}
     ${t?.deviation ? `<p class="warn-text">${esc(t.deviation)}</p>` : ""}</section>`;
+  html += mobilityCard();
 
   if (d) {
     const tasks = tasksHTML(d);

@@ -2,7 +2,9 @@
 // ramps with plate math, RPE logging with in-session load cuts, rest / hold /
 // guided-sequence timers, calibration ladders, notes.
 import { S, A, INPUTS, SHEETS, L, T, store, root, bar, esc, today, save, policy, queue, doneLog,
-  header, flashHTML, render, renderSheet, flushAll } from "./core.js";
+  header, flashHTML, render, renderSheet, flushAll, fuel } from "./core.js";
+import { matCard, mobilityCard } from "./mat.js";
+const fuelDay = (iso) => fuel()?.days.find((d) => d.date === iso) || null;
 
 export function label(lift) {
   const map = { trap_bar_deadlift: "Trap-bar DL", front_squat: "Front squat", high_bar_squat: "High-bar squat",
@@ -294,8 +296,10 @@ function holdFlow(bi, si) {
       onStop: (elapsed) => {
         b.state.secs[si] = Math.round(elapsed);
         save(); render();
-        if (b.state.secs.some((x) => x == null)) startRest(b.rest_s || 60, `${b.title} — set ${si + 2}`);
-        else startRest(b.rest_s || 60, nextUp());
+        const rest = b.rest_s ?? 60;
+        if (!rest) return;                                   // mobility holds flow straight on
+        if (b.state.secs.some((x) => x == null)) startRest(rest, `${b.title} — set ${si + 2}`);
+        else startRest(rest, nextUp());
       } });
   } });
 }
@@ -367,7 +371,7 @@ setInterval(() => {
 // ------------------------------------------------------------------ actions
 Object.assign(A, {
   open(d) {
-    const spec = S.plan?.sessions?.[d.k];
+    const spec = S.plan?.sessions?.[d.k] || S.plan?.routines?.[d.k];
     if (!spec) return;
     if (S.active && S.active.key !== d.k && !confirm(`Abandon the in-progress ${S.active.spec.title}? (Finish it first to keep it.)`)) return;
     if (!S.active || S.active.key !== d.k) S.active = L.startSession(spec, today());
@@ -485,6 +489,8 @@ export function viewTrain() {
       <details><summary>Today's full training plan</summary><ul class="plain">${(t.items || []).map((x) => `<li>${esc(x)}</li>`).join("")}</ul></details>
     </section>`;
   }
+  const day = fuelDay(today());
+  html += matCard(day) + mobilityCard();
   const keys = Object.keys(sessions).sort((x, y) => sessions[x].date.localeCompare(sessions[y].date));
   if (keys.length) html += `<section class="card"><h2>This week</h2>${keys.map((k) => sessionButton(sessions[k], false)).join("")}</section>`;
   const changes = (p.tm_changes || []).slice(-5).reverse();

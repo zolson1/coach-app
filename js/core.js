@@ -29,6 +29,8 @@ if (DEV) {
           kcal: 980, protein: 62, carbs: 118, fat: 30, uses: {}, pantry_used: ["ribeye"], why: "Uses the steak; a little more fat than the chili." },
         { title: "Salmon plate + extra rice", what: "Salmon plate (Recipe 5) + 1 cup rice", how: ["Thaw 15 min", "Roast 10 + 8 min"],
           kcal: 850, protein: 50, carbs: 113, fat: 22, uses: { salmon: 1 }, pantry_used: [], why: "Lighter; fish for the week." }] } }
+    : req.kind === "correct" ? { id: req.id, kind: "correct", status: "done", result: {
+        ops: [{ op: "report_sleep", date: req.date, hours: 7.5 }], understood: "Dev answer: logged 7.5 h of sleep for last night.", not_done: "" } }
     : { id: req.id, kind: req.kind, status: "done", result: { menu_id: "dev-draft", name: "Dev draft menu", summary: "A pretend draft.", problems: [], cards: {}, recipes: [], haul_est: 600 } });
   gh.getJSON = async (s, path) => {
     if (path.startsWith("out/app/responses/")) return store.get("dev:" + path) || (await fetch("dev/" + path.split("/").pop(), { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null));
@@ -37,6 +39,7 @@ if (DEV) {
   gh.getText = async () => "(dev) writeup";
   gh.putLog = async (s, log) => { store.set("devlogs", [...store.get("devlogs", []), log]); console.log("DEV log", log); return true; };
   gh.dispatchDaily = async () => true;
+  gh.dispatchWorkflow = async () => true;
 }
 
 export const S = {
@@ -113,6 +116,10 @@ export function fuel() {
   }
   return fuelMemo.value;
 }
+export const pendingOps = () => {
+  const applied = new Set(S.plan?.applied_ops || []);
+  return pendingBatches().filter((b) => !applied.has(b.id)).flatMap((b) => b.ops);
+};
 export const pendingCount = () => {
   const applied = new Set(S.plan?.applied_ops || []);
   return pendingBatches().filter((b) => !applied.has(b.id)).length;

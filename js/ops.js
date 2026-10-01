@@ -182,6 +182,14 @@ export function applyOps(f, ops, ctx = {}) {
       case "set_menu":
         f.menus.pending = o.id;
         break;
+      case "mat_log": {
+        const d = day(o.date);
+        if (!d) break;
+        d.mat_log = { ...(d.mat_log || {}) };
+        if (o.status === "clear") delete d.mat_log[o.slot];
+        else d.mat_log[o.slot] = { status: o.status, ...(o.class ? { class: o.class } : {}), ...(o.note ? { note: o.note } : {}) };
+        break;
+      }
       case "sweat_test":
         f.sweat_tests = [...(f.sweat_tests || []), sweat({ ...o, date })];
         break;

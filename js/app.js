@@ -11,6 +11,7 @@ import { wireCharts } from "./charts.js";
 import "./ui.js";
 import { viewMat } from "./mat.js";
 import "./fix.js";
+import "./ask.js";
 
 const TABS = [["today", "Today", "☀"], ["train", "Train", "🏋"], ["fuel", "Fuel", "🍽"], ["kitchen", "Kitchen", "🧊"], ["progress", "Progress", "📈"]];
 const TAB_VIEW = { today: viewToday, train: viewTrain, fuel: viewFuel, kitchen: viewKitchen, progress: viewProgress };

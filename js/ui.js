@@ -35,6 +35,10 @@ export function tasksHTML(d, { when = null, title = null } = {}) {
   const done = new Set(d.tasks_done || []);
   return `${title ? `<h3 class="sub">${esc(title)}</h3>` : ""}<div class="tasks">${tasks.map((t) => {
     const isDone = done.has(t.id);
+    if (t.id === "company") {             // "tomorrow's dinner: with her (the usual)?" — answer it right here
+      return `<div class="check"><span class="tick ghost">🍽</span><span>${esc(t.text)}
+        ${whoButtons(t.date, t.slot || "dinner", t.who)}</span></div>`;
+    }
     if (t.cook_day && !isDone) {
       return `<div class="check"><span class="tick ghost">🍳</span><span>${esc(t.text)}</span>
         <button class="btn sm primary" data-a="startcook" data-k="cook${t.cook_day}">Start</button></div>`;
@@ -56,7 +60,27 @@ Object.assign(A, {
     send(ops);
   },
   startcook(d) { go("cook", d.k); },
+  company(d) { send({ op: "company", date: d.date, slot: d.slot, who: d.who }); },
 });
+
+// Who's eating a meal: just him, with her at his place (the plan's food, a
+// for-two pack), or at hers / out (not the plan's food).
+export const WHO = [["solo", "Just me"], ["shared", "With her"], ["away", "At hers / out"]];
+export function whoButtons(date, slot, current) {
+  return `<div class="segs who">${WHO.map(([k, l]) => `<button class="seg ${current === k ? "on" : ""}" data-a="company"
+    data-date="${esc(date)}" data-slot="${esc(slot)}" data-who="${k}">${l}</button>`).join("")}</div>`;
+}
+export function companyControl(d, r) {
+  const slot = r.slot === "dinner" ? "Dinner" : "Lunch";
+  return `<div class="company"><p class="small"><b>${slot} ${esc(r.time)}</b>
+    <span class="muted">${r.company_pending ? "· updating…" : r.company_set ? "" : r.company_counted ? "· as counted this morning" : "· the usual"}</span></p>
+    ${whoButtons(d.date, r.slot, r.company)}</div>`;
+}
+export function companyDetail(r) {
+  if (r.company === "shared" && r.for_two) return `<p class="adj">${esc(r.for_two)}</p>`;
+  if (r.company === "away" && r.away_note) return `<p class="adj">${esc(r.away_note)}</p>`;
+  return "";
+}
 
 export function macroLine(r) {
   if (r.kcal == null) return "";

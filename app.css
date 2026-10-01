@@ -337,3 +337,20 @@ select, .fld select, .addrow input { width: 100%; min-height: 44px; border-radiu
 .datatable th { color: var(--muted); font-weight: 600; }
 
 .tasks { display: grid; gap: 4px; }
+
+/* ask the coach · who's eating · cooking for two */
+.btnpair { display: flex; gap: 6px; }
+.company { margin: 10px 0 6px; }
+.company p { margin: 0 0 6px; }
+.company + .adj { margin-bottom: 6px; }
+.segs.who .seg { font-size: .85rem; padding: 8px 2px; }
+.check .segs.who { margin-top: 6px; }
+.qa { max-height: 48vh; overflow-y: auto; margin-bottom: 8px; }
+.qa-item { border-bottom: 1px solid var(--line); padding: 8px 0; }
+.qa-item:last-child { border-bottom: 0; }
+.qa-item .q { font-weight: 600; margin: 2px 0 4px; }
+.qa-item .a { margin: 0 0 4px; line-height: 1.4; }
+.aboutchip { font-size: .85rem; background: var(--card-2); padding: 6px 10px; border-radius: 10px; margin: 0 0 8px; }
+.packitem { border-top: 1px solid var(--line); padding: 10px 0 4px; }
+.packitem:first-of-type { border-top: 0; }
+.packitem p { margin: 0 0 6px; }

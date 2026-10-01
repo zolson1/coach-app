@@ -61,6 +61,11 @@ export function applyOps(f, ops, ctx = {}) {
           const alt = cd.alternate_loop_yields || {};
           const withAlt = o.with_alternates ?? Object.keys(alt).some((k) => (f.kitchen.counts[k] || 0) <= 2);
           if (withAlt) for (const [k, n] of Object.entries(alt)) yields[k] = (yields[k] || 0) + n;
+          for (const [k, p] of Object.entries(o.packs || {})) {        // packed for two: singles + for-two packs
+            if (!(k in yields) || !p) continue;
+            yields[k] = Math.max(0, Number(p.single ?? yields[k]) || 0);
+            if (Number(p.duo) > 0 && `${k}_duo` in f.kitchen.counts) yields[`${k}_duo`] = Number(p.duo);
+          }
           f.kitchen.last_cook = date;
           f.kitchen.stocked = true;
         } else if (o.item in f.kitchen.counts) {
@@ -190,6 +195,20 @@ export function applyOps(f, ops, ctx = {}) {
         else d.mat_log[o.slot] = { status: o.status, ...(o.class ? { class: o.class } : {}), ...(o.note ? { note: o.note } : {}) };
         break;
       }
+      case "company": {               // who's eating; the batch counts follow when the coach applies it
+        const r = day(date)?.card.rows.find((x) => x.slot === (o.slot || "dinner"));
+        if (!r || !r.company) break;
+        const who = o.who === "clear" ? (f.company?.[r.slot] || "solo") : o.who;
+        if (who === "away" && r.company !== "away") { r.planned = r.what; r.what = "At hers / out — not the plan's food"; }
+        if (who !== "away" && r.company === "away" && r.planned) { r.what = r.planned; delete r.planned; }
+        if (who !== "shared") delete r.for_two;
+        if (who !== "away") delete r.away_note;
+        Object.assign(r, { company: who, company_set: o.who !== "clear", company_pending: true });
+        break;
+      }
+      case "company_settings":
+        f.company = { ...(f.company || {}), ...Object.fromEntries(["dinner", "lunch", "share"].filter((k) => o[k] != null).map((k) => [k, o[k]])) };
+        break;
       case "sweat_test":
         f.sweat_tests = [...(f.sweat_tests || []), sweat({ ...o, date })];
         break;

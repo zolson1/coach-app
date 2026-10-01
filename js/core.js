@@ -29,6 +29,9 @@ if (DEV) {
           kcal: 980, protein: 62, carbs: 118, fat: 30, uses: {}, pantry_used: ["ribeye"], why: "Uses the steak; a little more fat than the chili." },
         { title: "Salmon plate + extra rice", what: "Salmon plate (Recipe 5) + 1 cup rice", how: ["Thaw 15 min", "Roast 10 + 8 min"],
           kcal: 850, protein: 50, carbs: 113, fat: 22, uses: { salmon: 1 }, pantry_used: [], why: "Lighter; fish for the week." }] } }
+    : req.kind === "ask" ? { id: req.id, kind: "ask", status: "done", result: {
+        question: req.text, about: req.about || null, ops: /hers/i.test(req.text) ? [{ op: "company", date: req.date, slot: "dinner", who: "away" }] : [],
+        answer: "Dev answer: the tendon shot is the collagen in the OJ — the rice cakes and honey stay. Eat them right after the LIC.", flag: "" } }
     : req.kind === "correct" ? { id: req.id, kind: "correct", status: "done", result: {
         ops: [{ op: "report_sleep", date: req.date, hours: 7.5 }], understood: "Dev answer: logged 7.5 h of sleep for last night.", not_done: "" } }
     : { id: req.id, kind: req.kind, status: "done", result: { menu_id: "dev-draft", name: "Dev draft menu", summary: "A pretend draft.", problems: [], cards: {}, recipes: [], haul_est: 600 } });

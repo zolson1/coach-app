@@ -117,3 +117,28 @@ test("sweat test matches the coach's arithmetic", () => {
   assert.equal(r.third_bottle, false);
   assert.deepEqual(eaten(rowUses(card()), { dinner: { status: "skipped" } }), { oats_jars: 1, chicken_bowls: 1 });
 });
+
+test("who's eating shows at once; at hers keeps what was planned, and back again restores it", () => {
+  const f = fuel();
+  f.company = { dinner: "shared", lunch: "solo", share: 0.6 };
+  const dinner = f.days[1].card.rows.find((r) => r.slot === "dinner");
+  Object.assign(dinner, { company: "shared", company_set: false, for_two: "For two: …" });
+  applyOps(f, [{ op: "company", date: "2026-10-01", slot: "dinner", who: "away" }]);
+  assert.equal(dinner.company, "away");
+  assert.equal(dinner.planned, "chili");
+  assert.ok(!dinner.for_two && dinner.company_set && dinner.company_pending);
+  applyOps(f, [{ op: "company", date: "2026-10-01", slot: "dinner", who: "clear" }]);
+  assert.equal(dinner.company, "shared");                            // the usual
+  assert.equal(dinner.what, "chili");
+  assert.equal(dinner.company_set, false);
+  const lunch = f.days[1].card.rows.find((r) => r.slot === "lunch");
+  applyOps(f, [{ op: "company", date: "2026-10-01", slot: "lunch", who: "shared" }]);
+  assert.equal(lunch.company, undefined);                            // not a company row on this card: untouched
+});
+
+test("a cook day packed for two adds singles and for-two packs", () => {
+  const f = fuel();
+  f.kitchen.counts.chili_duo = 0;
+  applyOps(f, [{ op: "cooked", cook_day: 1, with_alternates: false, packs: { chili: { single: 4, duo: 5 } } }]);
+  assert.deepEqual([f.kitchen.counts.chili, f.kitchen.counts.chili_duo, f.kitchen.counts.chicken_bowls], [11, 5, 19]);
+});

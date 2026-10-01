@@ -1,7 +1,7 @@
 // The Today tab: the one screen to open — what to eat next, what to train,
 // what the kitchen needs tonight, and whether anything wants attention.
 import { S, A, esc, fuel, send, today, fmtNum, pendingCount } from "./core.js";
-import { levelChip, dayOf, statusLine, tasksHTML, macroLine, LEVEL_NAME } from "./ui.js";
+import { levelChip, dayOf, statusLine, tasksHTML, macroLine, LEVEL_NAME, companyControl, companyDetail } from "./ui.js";
 import { dayTotals, nextRow } from "./ops.js";
 import { sessionButton } from "./train.js";
 import { matCard, mobilityCard } from "./mat.js";
@@ -22,7 +22,7 @@ export function viewToday() {
     html += `<section class="card dayhead"><div class="lift-head"><h2>${esc(d.weekday)}</h2>${levelChip(lv.today, LEVEL_NAME[lv.today])}</div>
       <p class="big-num">${fmtNum(lv.kcal)} <span>kcal</span> · ${lv.protein}+ <span>g protein</span></p>
       <div class="lift-head"><p class="muted">${esc([statusLine(d), sleep ? `${sleep}${r.sleep_source === "reported" ? " (you)" : ""}` : null, r.hrv_state ? `HRV ${r.hrv_state}` : null].filter(Boolean).join(" · "))}</p>
-        <button class="btn sm" data-a="fixsheet">Fix</button></div>
+        <div class="btnpair"><button class="btn sm" data-a="asksheet">Ask</button><button class="btn sm" data-a="fixsheet">Fix</button></div></div>
       ${fixing.length ? `<p class="adj">Fix sent (${esc(fixing.map((o) => o.op === "report_sleep" ? `slept ${o.hours} h` : o.op === "schedule_override" ? `today is ${o.type.toLowerCase()}` : o.op === "neck_sore" ? "neck sore" : "neck fine").join(", "))}) — today rebuilds in about a minute.</p>` : ""}
       ${(lv.why || []).map((w) => `<p class="adj">${esc(w)}</p>`).join("")}
       <div class="meter" title="protein"><i style="width:${Math.min(100, (tot.protein / (f.protein_floor || 200)) * 100)}%"></i></div>
@@ -30,10 +30,12 @@ export function viewToday() {
 
     const now = new Date();
     const next = nextRow(d, now.getHours() * 60 + now.getMinutes());
+    const dinner = d.card.rows.find((r) => r.slot === "dinner" && r.company && !d.log?.[r.slot]);
     html += next ? `<section class="card next"><span class="eyebrow">Next · ${esc(next.time)}</span>
-        <h2>${esc(next.what)}</h2><p class="muted">${esc(macroLine(next))}</p>
+        <h2>${esc(next.what)}</h2><p class="muted">${esc(macroLine(next))}</p>${companyDetail(next)}
         <div class="two"><button class="btn primary" data-a="atenext" data-slot="${esc(next.slot)}">Ate it</button>
-          <button class="btn" data-a="tab" data-t="fuel">The whole card</button></div></section>`
+          <button class="btn" data-a="tab" data-t="fuel">The whole card</button></div>
+        ${dinner ? companyControl(d, dinner) + (dinner === next ? "" : companyDetail(dinner)) : ""}</section>`
       : `<section class="card next"><span class="eyebrow">Food</span><h2>Every meal is logged.</h2>
         <p class="muted">${fmtNum(tot.kcal)} kcal · ${tot.protein} g protein today.</p></section>`;
   } else if (f && !f.started) {

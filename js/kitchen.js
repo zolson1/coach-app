@@ -189,6 +189,8 @@ export function viewCook() {
   const yields = { ...c.yields, ...(withAlt ? c.alternate_loop_yields : {}) };
   const recipes = [...new Set(Object.keys(yields).map((k) => f.menu.batches[k]?.recipe).filter(Boolean))];
   const elapsed = mine.started ? L.fmtClock((Date.now() - mine.started) / 1000) : null;
+  const pack = cookPack(f, key);
+  const scaled = Object.fromEntries((pack?.items || []).filter((p) => p.scale > 1).map((p) => [p.recipe, p]));
   return `${header(c.title, `about ${c.hours} h`, back(), elapsed ? `<span class="elapsed" id="cookclock">${elapsed}</span>` : "")}
   <main class="wrap">${flashHTML()}
     <section class="card"><p>${esc(c.prep || "")}</p>
@@ -197,11 +199,19 @@ export function viewCook() {
       ${c.note ? `<p class="muted small">${esc(c.note)}</p>` : ""}
       ${mine.started ? "" : `<button class="btn primary big" data-a="cookstart">Start the clock</button>`}
     </section>
+    ${pack ? `<section class="card"><h2>Cooking for two</h2>
+      <p class="muted small">She eats about ${Math.round(pack.share * 100)}% of a portion and you've shared about ${Math.round((pack.rate?.dinner ?? 0) * 100)}% of dinners lately, over the ${pack.covers_days} days this cook covers. Make a bit more and pack it so a shared dinner is one pack.</p>
+      ${pack.items.map((p) => { const v = packVals(mine, p); return `<div class="packitem">
+        <p><b>${esc(p.label)}${p.scale > 1 ? ` — make ${p.scale}×` : ""}</b></p>
+        ${p.note ? `<p class="muted small">${esc(p.note)}</p>` : ""}
+        <div class="two"><label class="fld">For-two packs${p.pack_size ? ` (${esc(p.pack_size)})` : ""}<input type="number" inputmode="numeric" data-a="cookpack" data-k="${esc(p.item)}" data-f="duo" value="${v.duo}"></label>
+          <label class="fld">Singles${p.single_size ? ` (${esc(p.single_size)})` : ""}<input type="number" inputmode="numeric" data-a="cookpack" data-k="${esc(p.item)}" data-f="single" value="${v.single}"></label></div></div>`; }).join("")}
+      <p class="muted small">The timeline's amounts are for a 1× cook — use the scaled recipes below. Change the numbers to what you actually packed; Done adds exactly those.</p></section>` : ""}
     <section class="card"><h2>Timeline</h2><div class="tasks">${c.timeline.map(([at, what], i) => `<div class="check ${done.has(i) ? "done" : ""}">
       <button class="tick" data-a="cookstep" data-i="${i}">${done.has(i) ? "✓" : ""}</button>
       <span><b class="at">${esc(at)}</b> ${esc(what)}</span></div>`).join("")}</div></section>
-    <section class="card"><h2>Recipes</h2>${recipes.map((k) => { const r = f.menu.recipes[k]; return `<details class="cues"><summary>${esc(r.title)}</summary>
-      <ul class="plain">${r.ingredients.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
+    <section class="card"><h2>Recipes</h2>${recipes.map((k) => { const r = f.menu.recipes[k]; const sc = scaled[k]; return `<details class="cues"><summary>${esc(r.title)}${sc ? ` ×${sc.scale}` : ""}</summary>
+      <ul class="plain">${(sc ? sc.ingredients : r.ingredients).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
       <ol class="plain">${r.steps.map((x) => `<li>${esc(x)}</li>`).join("")}</ol><p class="muted small">${esc(r.storage || "")}</p></details>`; }).join("")}</section>
     <div class="finishbar"><button class="btn primary big" data-a="cookdone">Done — add it all to the freezer</button></div>
   </main>`;
@@ -211,6 +221,17 @@ setInterval(() => {
   const st = store.get("cook");
   if (el && st?.started) el.textContent = L.fmtClock((Date.now() - st.started) / 1000);
 }, 1000);
+
+// The pack plan the coach worked out for this cook day (kitchen.next.cook.pack),
+// with whatever he typed over it.
+function cookPack(f, key) {
+  const c = f.kitchen.next?.cook;
+  return c?.key === key ? c.pack || null : null;
+}
+function packVals(st, p) {
+  const typed = st?.packs?.[p.item] || {};
+  return { duo: typed.duo ?? p.duo, single: typed.single ?? p.singles };
+}
 
 // ------------------------------------------------------------ a new cycle
 export function viewCycle() {
@@ -316,7 +337,11 @@ Object.assign(A, {
   pantrydel(d) { send({ op: "pantry_remove", id: d.id }); },
   recipe(d) { sheet(null); go("recipe", d.k); },
   cycle() { go("cycle"); },
-  cookstart() { store.set("cook", { key: S.viewArg, started: Date.now(), done: [] }); T.keepAwake(true); render(); },
+  cookstart() {
+    const prev = store.get("cook")?.key === S.viewArg ? store.get("cook") : {};
+    store.set("cook", { ...prev, key: S.viewArg, started: Date.now(), done: [] });
+    T.keepAwake(true); render();
+  },
   cookstep(d) {
     const st = store.get("cook")?.key === S.viewArg ? store.get("cook") : { key: S.viewArg, started: Date.now(), done: [] };
     const set = new Set(st.done);
@@ -333,7 +358,9 @@ Object.assign(A, {
     const alt = Object.keys(c.alternate_loop_yields || {});
     const withAlt = st.alt ?? alt.some((k) => (f.kitchen.counts[k] || 0) <= 2);
     if (!confirm(`Log ${c.title}? This adds its portions to your counts.`)) return;
-    const ops = [{ op: "cooked", cook_day: Number(key.replace("cook", "")), with_alternates: withAlt, date: today() }];
+    const pack = cookPack(f, key);
+    const packs = pack ? Object.fromEntries(pack.items.map((p) => [p.item, packVals(st, p)])) : null;
+    const ops = [{ op: "cooked", cook_day: Number(key.replace("cook", "")), with_alternates: withAlt, date: today(), ...(packs ? { packs } : {}) }];
     if (dayOf(today())?.tasks.some((t) => t.id === key)) ops.push({ op: "task_done", date: today(), task: key, done: true });
     store.set("cook", null);
     T.keepAwake(!!S.active);
@@ -386,6 +413,12 @@ SHEETS.text = (sh) => `<div class="sheet"><h3>${esc(sh.title)}</h3><textarea row
   <button class="btn ghost" data-a="closesheet">Close</button></div>`;
 
 export const kitchenInputs = {
+  cookpack(el) {
+    const st = store.get("cook")?.key === S.viewArg ? store.get("cook") : { key: S.viewArg, started: null, done: [] };
+    const packs = { ...(st.packs || {}) };
+    packs[el.dataset.k] = { ...(packs[el.dataset.k] || {}), [el.dataset.f]: Math.max(0, Number(el.value) || 0) };
+    store.set("cook", { ...st, packs });
+  },
   cyprefs(el) { store.set("cycleprefs", el.value); },
   cypantry(el) { store.set("cyclepantry", el.checked); },
   cookalt(el) {

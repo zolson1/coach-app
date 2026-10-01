@@ -1,9 +1,9 @@
 // App-shell cache so the app opens with no signal (basement gyms, the
 // firehouse). Only same-origin files are cached — GitHub API calls always go
 // to the network (the plan's offline copy lives in localStorage).
-const CACHE = "coach-v3";
+const CACHE = "coach-v4";
 const SHELL = ["./", "index.html", "app.css", "js/app.js", "js/core.js", "js/ops.js", "js/ui.js", "js/train.js", "js/fuel.js",
-  "js/kitchen.js", "js/progress.js", "js/today.js", "js/charts.js", "js/mat.js", "js/fix.js", "js/logic.js", "js/store.js", "js/gh.js",
+  "js/kitchen.js", "js/progress.js", "js/today.js", "js/charts.js", "js/mat.js", "js/fix.js", "js/ask.js", "js/logic.js", "js/store.js", "js/gh.js",
   "js/timer.js", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png"];
 
 self.addEventListener("install", (e) => {

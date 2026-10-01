@@ -2,7 +2,7 @@
 // check-offs, skips and swaps, deviations for that day, and the small tools
 // around eating (level override, eating out, the sweat test).
 import { S, A, SHEETS, esc, fuel, send, sheet, render, renderSheet, today, ask, requests, store, fmtNum, uid } from "./core.js";
-import { levelChip, dayOf, dayLabel, statusLine, macroLine, LEVEL_NAME } from "./ui.js";
+import { levelChip, dayOf, dayLabel, statusLine, macroLine, LEVEL_NAME, companyControl, companyDetail } from "./ui.js";
 import { dayTotals, sweat } from "./ops.js";
 
 const SESSION_NAME = { strength_a: "Strength A", strength_b: "Strength B", domain: "Domain Day", lic: "Zone 2",
@@ -43,6 +43,16 @@ function dayHTML(f, d) {
       <p class="muted small">Logged ${t.logged} of ${t.rows} · ${fmtNum(t.kcal)} of ${fmtNum(t.plan_kcal)} kcal · ${t.protein} g protein (floor ${f.protein_floor})</p>` : ""}
   </section>`;
 
+  const company = d.card.rows.filter((r) => r.company);
+  if (company.length) {
+    const c = f.company || {};
+    html += `<section class="card"><div class="lift-head"><h2>Who's eating</h2>
+        <button class="btn sm" data-a="companysheet">Usual</button></div>
+      ${company.map((r) => companyControl(d, r) + companyDetail(r)).join("")}
+      <p class="muted small">She eats about ${Math.round((c.share || 0.6) * 100)}% of your portion. Set it the day before when you can — tonight's thaw follows it.</p>
+    </section>`;
+  }
+
   html += `<section class="card"><div class="lift-head"><h2>${esc(d.card.title)}</h2><span class="tm">${esc(d.card.totals)}</span></div>
     <div class="rows meal">${d.card.rows.map((r) => rowHTML(d, r)).join("")}</div>
     ${live && t.logged < t.rows ? `<button class="btn ghost" data-a="ateall" data-date="${d.date}">Mark the rest as eaten</button>` : ""}
@@ -69,6 +79,8 @@ function dayHTML(f, d) {
   html += `<div class="toolrow">
     ${d.when === "today" ? `<button class="btn sm" data-a="levelsheet">Change today's level</button>` : ""}
     <button class="btn sm" data-a="eatout" data-date="${d.date}">Eating out</button>
+    <button class="btn sm" data-a="companysheet">Eating with her</button>
+    <button class="btn sm" data-a="asksheet">Ask the coach</button>
     <button class="btn sm" data-a="sweatsheet">Sweat test</button>
   </div>`;
   return html;
@@ -80,10 +92,13 @@ function rowHTML(d, r) {
   const state = e?.status;
   const swapped = state === "swapped" && e.swap;
   const icon = state === "eaten" ? "✓" : state === "skipped" ? "✕" : swapped ? "⇄" : "";
-  const macros = r.kcal == null ? "" : swapped ? macroLine(e.swap) : macroLine(r);
+  const who = r.company === "shared" ? " · for two" : r.company === "away" ? " · not from the freezer" : "";
+  const macros = (r.kcal == null ? "" : swapped ? macroLine(e.swap) : macroLine(r)) + who;
+  const what = swapped ? `${esc(e.swap.title || e.swap.what)} <s>${esc(r.what)}</s>`
+    : r.company === "away" && r.planned ? `${esc(r.what)} <s>${esc(r.planned)}</s>` : esc(r.what);
   return `<button class="row mealrow ${state || ""}" data-a="rowsheet" data-date="${d.date}" data-slot="${esc(r.slot)}">
     <span class="k">${esc(r.time)}</span>
-    <span class="load">${swapped ? `${esc(e.swap.title || e.swap.what)} <s>${esc(r.what)}</s>` : esc(r.what)}</span>
+    <span class="load">${what}</span>
     <span class="plates">${esc(macros)}</span>
     <span class="chk ${state || ""}">${icon}</span></button>`;
 }
@@ -98,14 +113,16 @@ SHEETS.row = (sh) => {
   const live = d.when !== "future";
   const recipe = recipeFor(r);
   return `<div class="sheet"><h3>${esc(r.time)} — ${esc(dayLabel(d.date))}</h3>
-    <p>${esc(r.what)}</p><p class="muted">${esc(macroLine(r))}</p>
+    <p>${esc(r.what)}</p>${r.planned ? `<p class="muted small">Planned: ${esc(r.planned)}</p>` : ""}<p class="muted">${esc(macroLine(r))}</p>
     ${e?.status === "swapped" ? `<p class="adj">Swapped for: ${esc(e.swap.what)} (${esc(macroLine(e.swap))})</p>` : ""}
+    ${r.company ? companyControl(d, r) + companyDetail(r) : ""}
     <div class="choices">
       ${live ? `<button class="btn primary big" data-a="meal" data-status="eaten">Ate it</button>` : ""}
       <button class="btn big" data-a="swapsheet">${live ? "Had something else…" : "Plan a swap…"}</button>
       <button class="btn big" data-a="meal" data-status="skipped">${live ? "Skipped it" : "Will skip it"}</button>
       ${e ? `<button class="btn ghost" data-a="meal" data-status="clear">Clear</button>` : ""}
       ${recipe ? `<button class="btn ghost" data-a="recipe" data-k="${esc(recipe)}">Recipe</button>` : ""}
+      <button class="btn ghost" data-a="asksheet" data-date="${esc(d.date)}" data-slot="${esc(r.slot)}">Ask about this</button>
     </div>
     <button class="btn ghost" data-a="closesheet">Close</button></div>`;
 };
@@ -189,6 +206,21 @@ SHEETS.eatout = (sh) => {
     ${orders.map((s) => `<div class="option static"><b>${esc(s.title)}</b><span>${esc(s.what)}</span><span class="muted">${esc(macroLine(s))}</span></div>`).join("")}
     <p class="muted small">It replaces the card's meal at that time — don't eat both, and don't skip earlier meals to save calories.</p>
     <button class="btn ghost" data-a="closesheet">Close</button></div>`;
+};
+
+SHEETS.company = () => {
+  const c = fuel().company || {};
+  const opt = (v, l, cur) => `<option value="${v}" ${String(cur) === String(v) ? "selected" : ""}>${l}</option>`;
+  const share = c.share >= 0.64 ? "0.67" : c.share <= 0.52 ? "0.5" : "0.6";
+  return `<div class="sheet"><h3>Eating with her</h3>
+    <p class="muted">The usual, for days you don't say otherwise. Change any one meal in the Fuel tab's "Who's eating" — the day before is best, so the thaw reminder pulls the right pack.</p>
+    <label class="fld">Dinner, usually<select id="cmdinner">${opt("shared", "With her, at mine", c.dinner)}${opt("solo", "Just me", c.dinner)}</select></label>
+    <label class="fld">Lunch, usually<select id="cmlunch">${opt("solo", "Just me", c.lunch)}${opt("shared", "With her, at mine", c.lunch)}</select></label>
+    <label class="fld">Her portion<select id="cmshare">${opt("0.5", "About half of mine", share)}${opt("0.6", "About 60% of mine", share)}${opt("0.67", "About two-thirds of mine", share)}</select></label>
+    ${c.rate != null ? `<p class="muted small">Lately you've shared about ${Math.round(c.rate * 100)}% of dinners — the cook day sizes the batch and the for-two packs from that.</p>` : ""}
+    <p class="muted small">Your own portions and macros never change. "At hers / out" takes that meal off the freezer, and the card gives you a protein-first target for it.</p>
+    <div class="sheet-foot"><button class="btn ghost" data-a="closesheet">Cancel</button>
+      <button class="btn primary" data-a="savecompany">Save</button></div></div>`;
 };
 
 SHEETS.sweat = () => {
@@ -276,6 +308,12 @@ Object.assign(A, {
     send({ op: "fuel_level", level: d.l, date: today(), why: why || undefined });
   },
   eatout(d) { sheet({ type: "eatout", date: d.date }); },
+  companysheet() { sheet({ type: "company" }); },
+  savecompany() {
+    const o = { op: "company_settings", dinner: val("cmdinner"), lunch: val("cmlunch"), share: Number(val("cmshare")) };
+    sheet(null);
+    send(o);
+  },
   sweatsheet() { sheet({ type: "sweat" }); },
   savesweat() {
     const o = { op: "sweat_test", date: today(), pre_lb: Number(val("swpre")), post_lb: Number(val("swpost")),

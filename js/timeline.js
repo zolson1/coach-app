@@ -162,7 +162,9 @@ function retime(items, tl, ctx, R) {
       if (it.kind === "meal") earliest = Math.max(earliest, mealT() + R.meal_gap_min, lastEat + R.snack_gap);
       else earliest = Math.max(earliest, lastEat + R.snack_gap);
     }
-    let t = it.slot === "during" ? it.t : clear(Math.max(it.t, up(earliest, R.round)));
+    const t0 = Math.max(it.t, up(earliest, R.round));
+    let t = it.slot === "during" ? it.t : clear(t0);
+    if (t !== t0) it.why = "after the session — not in the middle of it";
     // the first eating after training comes within 2 h of it
     if (lastTrain > lastEat && t > lastTrain + R.eat_after_session && it.kind === "snack" && it.slot !== "pre_sleep") {
       t = Math.max(up(lastTrain + 30, R.round), up(cursor, R.round)); it.why = "within 2 h of training";

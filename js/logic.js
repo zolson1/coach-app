@@ -62,6 +62,13 @@ export function afterWorkSet(block, liftState, entry, policy) {
   const rest = policy?.rest_s || {};
   const baseRest = block.rest_s || rest.main || 180;
   const res = { newLoad: null, endLift: false, skipOptional: false, restS: baseRest, reason: null, level: "ok" };
+  if (block.speed_rule === "end" && isGrind(entry, policy)) {      // Breacher: speed is the metric
+    res.endLift = true;
+    res.level = "stop";
+    res.reason = "Speed dropped — that's this exercise done for today. Grinding past it is counter-productive for power: move on.";
+    res.skipReason = "ended — speed dropped";
+    return res;
+  }
   if (isGrind(entry, policy)) {
     liftState.grinds = (liftState.grinds || 0) + 1;
     res.restS = Math.max(baseRest, rest.over_cap || 240);
@@ -90,7 +97,7 @@ export function applyAdjustment(sets, fromIdx, res) {
   for (let i = fromIdx + 1; i < sets.length; i++) {
     const s = sets[i];
     if (s.done || s.skipped) continue;
-    if (res.endLift) { s.skipped = true; s.skipReason = "ended — second grind"; continue; }
+    if (res.endLift) { s.skipped = true; s.skipReason = res.skipReason || "ended — second grind"; continue; }
     if (s.optional && res.skipOptional) { s.skipped = true; s.skipReason = "only if the last set was fast"; continue; }
     if (res.newLoad != null) { s.from = s.from ?? s.load; s.load = res.newLoad; }
   }
@@ -190,7 +197,7 @@ export function buildLog(active, id) {
   const lifts = [], holds = [], setsItems = [], sequences = [];
   for (const b of s.blocks) {
     if (b.type === "lift") {
-      const isSingle = b.id.startsWith("single_");
+      const isSingle = b.id.startsWith("single_") || b.log_as === "single";      // heavy singles, Breacher primers
       const sets = [];
       b.warmups.filter((w) => w.done).forEach((w) => sets.push({ type: "warmup", load: w.load ?? 0, reps: w.reps }));
       const ladder = b.state.ladder.map((l) => ({ type: "calibration", load: l.load, reps: l.reps, rpe: l.rpe, slowed: !!l.slowed, at: l.at }));

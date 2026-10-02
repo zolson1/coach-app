@@ -91,3 +91,16 @@ test("session lifecycle → log the coach can ingest", () => {
   a.spec.blocks[0].work.forEach((w) => Object.assign(w, { done: true, rpe: 6.5 }));
   assert.equal(L.sessionStatus(a), "done");
 });
+
+test("Breacher: a slowed rep on a speed-governed lift ends it at once", async () => {
+  const L = await import("../js/logic.js");
+  const block = { speed_rule: "end", rest_s: 240, rpe_cap: 8 };
+  const st = { grinds: 0 };
+  const ok = L.afterWorkSet(block, st, { load: 130, reps: 3, target_reps: 3, rpe: 6, slowed: false }, {});
+  assert.equal(ok.endLift, false);
+  const slow = L.afterWorkSet(block, st, { load: 130, reps: 3, target_reps: 3, rpe: 6, slowed: true }, {});
+  assert.equal(slow.endLift, true);
+  const sets = [{ done: true }, { done: false }, { done: false }];
+  L.applyAdjustment(sets, 0, slow);
+  assert.deepEqual(sets.slice(1).map((x) => x.skipReason), ["ended — speed dropped", "ended — speed dropped"]);
+});

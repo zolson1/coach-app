@@ -4,6 +4,8 @@
 import { S, A, SHEETS, esc, fuel, send, sheet, render, renderSheet, today, ask, requests, store, fmtNum, uid } from "./core.js";
 import { levelChip, dayOf, dayLabel, statusLine, macroLine, LEVEL_NAME, companyControl, companyDetail } from "./ui.js";
 import { dayTotals, sweat } from "./ops.js";
+import { timelineCard, nowMin } from "./day.js";
+import { hm } from "./timeline.js";
 
 const SESSION_NAME = { strength_a: "Strength A", strength_b: "Strength B", domain: "Domain Day", lic: "Zone 2",
   loaded_mobility: "Loaded mobility", mobility_pm: "Mobility", rest: "Rest" };
@@ -52,6 +54,8 @@ function dayHTML(f, d) {
       <p class="muted small">She eats about ${Math.round((c.share || 0.6) * 100)}% of your portion. Set it the day before when you can — tonight's thaw follows it.</p>
     </section>`;
   }
+
+  html += timelineCard(d, { title: d.when === "today" ? "Today's timeline" : "Day timeline — meals and training", open: d.when === "future" });
 
   html += `<section class="card"><div class="lift-head"><h2>${esc(d.card.title)}</h2><span class="tm">${esc(d.card.totals)}</span></div>
     <div class="rows meal">${d.card.rows.map((r) => rowHTML(d, r)).join("")}</div>
@@ -117,7 +121,9 @@ SHEETS.row = (sh) => {
     ${e?.status === "swapped" ? `<p class="adj">Swapped for: ${esc(e.swap.what)} (${esc(macroLine(e.swap))})</p>` : ""}
     ${r.company ? companyControl(d, r) + companyDetail(r) : ""}
     <div class="choices">
-      ${live ? `<button class="btn primary big" data-a="meal" data-status="eaten">Ate it</button>` : ""}
+      ${live ? `<button class="btn primary big" data-a="meal" data-status="eaten">Ate it${e?.ate_at ? "" : " (as planned)"}</button>
+        <div class="two"><label class="fld">Ate it at<input type="time" id="ateat" value="${esc(e?.ate_at || (d.when === "today" ? hm(nowMin()) : ""))}"></label>
+          <button class="btn" data-a="ateat">Ate it at this time</button></div>` : ""}
       <button class="btn big" data-a="swapsheet">${live ? "Had something else…" : "Plan a swap…"}</button>
       <button class="btn big" data-a="meal" data-status="skipped">${live ? "Skipped it" : "Will skip it"}</button>
       ${e ? `<button class="btn ghost" data-a="meal" data-status="clear">Clear</button>` : ""}
@@ -160,6 +166,7 @@ SHEETS.swap = (sh) => {
   }
   return `<div class="sheet"><h3>Instead of: ${esc(r.what)}</h3>
     <p class="muted">Target ${esc(macroLine(r))}</p>
+    ${d.when !== "future" ? `<button class="btn primary big" data-a="devsheet" data-date="${esc(sh.date)}" data-slot="${esc(sh.slot)}">Describe what I ate — the coach estimates it</button>` : ""}
     ${builtin.length ? `<h4>From the plan</h4>${builtin.map((s, i) => opt(s, i, "menu")).join("")}` : ""}
     <h4>From what you have</h4>
     ${coach}

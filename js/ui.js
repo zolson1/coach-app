@@ -70,9 +70,9 @@ export function whoButtons(date, slot, current) {
   return `<div class="segs who">${WHO.map(([k, l]) => `<button class="seg ${current === k ? "on" : ""}" data-a="company"
     data-date="${esc(date)}" data-slot="${esc(slot)}" data-who="${k}">${l}</button>`).join("")}</div>`;
 }
-export function companyControl(d, r) {
+export function companyControl(d, r, at = null) {
   const slot = r.slot === "dinner" ? "Dinner" : "Lunch";
-  return `<div class="company"><p class="small"><b>${slot} ${esc(r.time)}</b>
+  return `<div class="company"><p class="small"><b>${slot} ${esc(at || r.time)}</b>
     <span class="muted">${r.company_pending ? "· updating…" : r.company_set ? "" : r.company_counted ? "· as counted this morning" : "· the usual"}</span></p>
     ${whoButtons(d.date, r.slot, r.company)}</div>`;
 }

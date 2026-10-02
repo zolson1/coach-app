@@ -6,6 +6,7 @@ import { dayTotals, nextRow } from "./ops.js";
 import { sessionButton } from "./train.js";
 import { matCard, mobilityCard } from "./mat.js";
 import { fixPending } from "./fix.js";
+import { timelineCard, nextOf } from "./day.js";
 
 export function viewToday() {
   const p = S.plan;
@@ -29,8 +30,33 @@ export function viewToday() {
       <p class="muted small">${tot.logged} of ${tot.rows} meals logged · ${tot.protein} of ${f.protein_floor} g protein</p></section>`;
 
     const now = new Date();
-    const next = nextRow(d, now.getHours() * 60 + now.getMinutes());
     const dinner = d.card.rows.find((r) => r.slot === "dinner" && r.company && !d.log?.[r.slot]);
+    const nx = nextOf(d);
+    const dinnerAt = nx?.live.items.find((x) => x.slot === "dinner")?.at || null;
+    if (nx) {
+      // the next thing from the live day: a meal (re-timed, with any rebalance) or a session
+      const i = nx.item;
+      const notes = [i.moved && i.why ? i.why : null, ...(i.adjust || [])].filter(Boolean);
+      if (i.kind === "train") {
+        const spec = p?.sessions?.[i.session];
+        html += `<section class="card next"><span class="eyebrow">Next · ${esc(i.at)}${i.until ? `–${esc(i.until)}` : ""}</span>
+          <h2>${esc(i.label)}</h2>${notes.map((n) => `<p class="adj">${esc(n)}</p>`).join("")}
+          <div class="two">${spec ? `<button class="btn primary" data-a="open" data-k="${esc(i.session)}">Start</button>` : ""}
+            ${i.train === "mat" ? `<button class="btn" data-a="classsheet" data-date="${d.date}" data-slot="${esc(i.session.replace(/^mat_/, ""))}">Class done / swapped…</button>`
+              : `<button class="btn" data-a="sesssheet" data-date="${d.date}" data-id="${esc(i.id)}">Done / moved / skipped…</button>`}</div>
+          ${dinner ? companyControl(d, dinner, dinnerAt) + companyDetail(dinner) : ""}</section>`;
+      } else {
+        const row = d.card.rows.find((r) => r.slot === i.slot) || {};
+        html += `<section class="card next"><span class="eyebrow">Next · ${esc(i.at)}${i.moved ? ` <s>${esc(row.time || "")}</s>` : ""}</span>
+          <h2>${esc(i.label || i.what)}</h2><p class="muted">${esc(macroLine(i.eff ? { ...i.eff, kcal: Math.round(i.eff.kcal) } : i))}</p>
+          ${notes.map((n) => `<p class="adj">${esc(n)}</p>`).join("")}${companyDetail(row)}
+          <div class="two"><button class="btn primary" data-a="atenext" data-slot="${esc(i.slot)}" data-at="${esc(i.at)}">Ate it</button>
+            <button class="btn" data-a="devsheet" data-date="${d.date}" data-slot="${esc(i.slot)}">Ate something else</button></div>
+          ${dinner ? companyControl(d, dinner, dinnerAt) + (dinner.slot === i.slot ? "" : companyDetail(dinner)) : ""}</section>`;
+      }
+      html += timelineCard(d);
+    } else {
+    const next = nextRow(d, now.getHours() * 60 + now.getMinutes());
     html += next ? `<section class="card next"><span class="eyebrow">Next · ${esc(next.time)}</span>
         <h2>${esc(next.what)}</h2><p class="muted">${esc(macroLine(next))}</p>${companyDetail(next)}
         <div class="two"><button class="btn primary" data-a="atenext" data-slot="${esc(next.slot)}">Ate it</button>
@@ -38,6 +64,7 @@ export function viewToday() {
         ${dinner ? companyControl(d, dinner) + (dinner === next ? "" : companyDetail(dinner)) : ""}</section>`
       : `<section class="card next"><span class="eyebrow">Food</span><h2>Every meal is logged.</h2>
         <p class="muted">${fmtNum(tot.kcal)} kcal · ${tot.protein} g protein today.</p></section>`;
+    }
   } else if (f && !f.started) {
     html += `<section class="card"><h2>The fuel plan starts ${esc(f.start)}</h2></section>`;
   }
@@ -66,7 +93,7 @@ export function viewToday() {
     if (notes.length) html += `<section class="card"><h2>Worth a look</h2>${notes.join("")}</section>`;
   }
 
-  html += `<div class="toolrow"><button class="btn sm" data-a="offcard" data-date="${today()}">Log a deviation</button>
+  html += `<div class="toolrow"><button class="btn sm" data-a="devsheet" data-date="${today()}">Ate something else</button>
     <button class="btn sm" data-a="weightsheet">Weigh-in</button><button class="btn sm" data-a="waistsheet">Waist</button></div>`;
   const n = pendingCount();
   if (n) html += `<p class="muted small center">${n} change${n > 1 ? "s" : ""} syncing to the coach…</p>`;
@@ -74,5 +101,5 @@ export function viewToday() {
 }
 
 Object.assign(A, {
-  atenext(d) { send({ op: "meal_log", date: today(), slot: d.slot, status: "eaten" }); },
+  atenext(d) { send({ op: "meal_log", date: today(), slot: d.slot, status: "eaten", ...(d.at ? { ate_at: d.at } : {}) }); },
 });

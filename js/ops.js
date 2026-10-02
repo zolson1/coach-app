@@ -98,7 +98,8 @@ export function applyOps(f, ops, ctx = {}) {
         const before = eaten(uses, d.log);
         d.log = { ...(d.log || {}) };
         if (o.status === "clear") delete d.log[o.slot];
-        else d.log[o.slot] = { status: o.status, ...(o.status === "swapped" ? { swap: o.swap } : {}), ...(o.note ? { note: o.note } : {}) };
+        else d.log[o.slot] = { status: o.status, ...(o.status === "swapped" ? { swap: o.swap } : {}), ...(o.note ? { note: o.note } : {}),
+          ...(o.ate_at ? { ate_at: o.ate_at } : {}) };
         const after = eaten(uses, d.log);
         if (d.when !== "future") {
           const delta = {};
@@ -145,7 +146,8 @@ export function applyOps(f, ops, ctx = {}) {
       }
       case "off_card": {
         if (f.off_card.some((x) => x.id === o.id)) break;
-        const e = { id: o.id, date, text: o.text, kind: o.kind, kcal: o.kcal, drinks: o.drinks, slot: o.slot };
+        const e = { id: o.id, date, text: o.text, kind: o.kind, kcal: o.kcal, drinks: o.drinks, slot: o.slot,
+          protein: o.protein, carbs: o.carbs, fat: o.fat, ate_at: o.ate_at };
         f.off_card.push(e);
         const d = day(date);
         if (d) d.off_card = [...(d.off_card || []), e];
@@ -193,6 +195,14 @@ export function applyOps(f, ops, ctx = {}) {
         d.mat_log = { ...(d.mat_log || {}) };
         if (o.status === "clear") delete d.mat_log[o.slot];
         else d.mat_log[o.slot] = { status: o.status, ...(o.class ? { class: o.class } : {}), ...(o.note ? { note: o.note } : {}) };
+        break;
+      }
+      case "session_log": {           // training timing on the day's timeline
+        const d = day(date);
+        if (!d) break;
+        d.session_log = { ...(d.session_log || {}) };
+        if (o.status === "clear") delete d.session_log[o.session];
+        else d.session_log[o.session] = { status: o.status, ...(o.at ? { at: o.at } : {}) };
         break;
       }
       case "company": {               // who's eating; the batch counts follow when the coach applies it

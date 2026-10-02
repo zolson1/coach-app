@@ -1,0 +1,109 @@
+// node --test test/ — the live day: re-timing and rebalancing from what's logged.
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { liveDay, toMin, hm } from "../js/timeline.js";
+
+const T = (s) => toMin(s);
+// An OFF day with a flexible lift — synthetic, shaped like coach/timeline.py's output.
+function day(over = {}) {
+  return {
+    date: "2026-10-09", log: {}, session_log: {}, mat_log: {}, off_card: [],
+    timeline: {
+      wake: T("07:00"), lights: T("22:30"), work: null, station: false, level: "F2",
+      targets: { kcal: 2900, protein: 230, carbs: 330, fat: 80 },
+      items: [
+        { id: "breakfast", slot: "breakfast", kind: "meal", t: T("07:00"), kcal: 680, protein: 48, carbs: 102, fat: 12, what: "Overnight oats + banana" },
+        { id: "lunch", slot: "lunch", kind: "meal", t: T("12:30"), kcal: 650, protein: 56, carbs: 46, fat: 22, what: "Chicken bowl" },
+        { id: "strength_a", kind: "train", train: "lift", session: "strength_a", t: T("15:00"), end: T("16:00"), label: "Strength A" },
+        { id: "snack", slot: "snack", kind: "snack", t: T("16:30"), kcal: 325, protein: 43, carbs: 33, fat: 4, what: "Core Power + apple" },
+        { id: "dinner", slot: "dinner", kind: "meal", t: T("19:00"), kcal: 1000, protein: 60, carbs: 120, fat: 30, what: "Chili + 1½ cups rice + salad with 1 tbsp olive oil" },
+        { id: "pre_sleep", slot: "pre_sleep", kind: "snack", t: T("21:30"), kcal: 220, protein: 26, carbs: 20, fat: 5, what: "Greek yogurt + berries + walnuts" },
+        { id: "lights", kind: "sleep", t: T("22:30"), label: "Lights out" },
+      ],
+    },
+    ...over,
+  };
+}
+const at = (live, id) => live.items.find((i) => i.id === id);
+
+test("nothing logged: the ideal day, past items assumed done", () => {
+  const live = liveDay(day(), { now: T("13:00") });
+  assert.equal(at(live, "lunch").status, "past");
+  assert.equal(at(live, "strength_a").at, "15:00");
+  assert.equal(live.next.id, "strength_a");
+  assert.equal(live.balance.deviated, false);
+  assert.ok(!live.items.some((i) => i.moved));
+});
+
+test("a late lunch pushes the lift 2 h past it, and what follows comes after", () => {
+  const d = day({ log: { lunch: { status: "eaten", ate_at: "14:15" } } });
+  const live = liveDay(d, { now: T("14:30") });
+  assert.equal(at(live, "strength_a").at, "16:15");
+  assert.ok(at(live, "strength_a").moved && /after your last meal/.test(at(live, "strength_a").why));
+  assert.equal(at(live, "snack").at, "17:30");           // not inside the lift: straight after it
+  assert.equal(at(live, "dinner").at, "19:00");          // 90 min after that snack
+});
+
+test("a lift moved by him is fixed, and the evening cutoff still holds", () => {
+  const d = day({ session_log: { strength_a: { status: "moved", at: "18:00" } } });
+  const live = liveDay(d, { now: T("13:00") });
+  assert.equal(at(live, "strength_a").at, "18:00");
+  assert.equal(at(live, "dinner").at, "19:00");          // right as the lift ends
+  const late = liveDay(day(), { now: T("19:00") });
+  assert.equal(at(late, "strength_a").status, "past");
+});
+
+test("too late to lift before the 3-h cutoff → squeezed, with the fallback", () => {
+  const d = day({ log: { lunch: { status: "eaten", ate_at: "18:00" } } });     // the lift was planned after lunch
+  const live = liveDay(d, { now: T("18:10") });
+  assert.ok(at(live, "strength_a").carried);
+  assert.equal(at(live, "strength_a").status, "squeezed");
+  assert.match(at(live, "strength_a").why, /Zone 2/);
+});
+
+test("a protein-light replacement → protein topped up; a fat-heavy one → the added fat goes", () => {
+  const d = day({ log: {
+    breakfast: { status: "swapped", swap: { what: "leftover injera + misir wat", kcal: 900, protein: 25, carbs: 110, fat: 40 } },
+    lunch: { status: "swapped", swap: { what: "leftover doro wat + injera", kcal: 1000, protein: 45, carbs: 90, fat: 45 } } } });
+  const live = liveDay(d, { now: T("13:00"), floor: 200 });
+  const b = live.balance;
+  assert.ok(b.deviated && b.dev.kcal > 500);
+  const texts = b.adjustments.map((a) => a.text).join(" | ");
+  assert.match(texts, /Core Power|palm|yogurt/);         // protein
+  assert.match(texts, /−\d carb portion/);              // a trim, at dinner (not before the lift)
+  assert.ok(!at(live, "snack").adjust?.some((x) => x.startsWith("−")));   // the post-lift snack is never trimmed
+  assert.ok(b.projected.protein >= 200);
+});
+
+test("an under-eaten morning before training → carbs added before the session", () => {
+  const d = day({ log: { breakfast: { status: "skipped" } } });
+  const live = liveDay(d, { now: T("09:00") });
+  assert.match(live.balance.adjustments.map((a) => a.text).join(" "), /\+\d carb portion.*Strength A/);
+});
+
+test("an OT night: dinner lands before clocking in; the pre-sleep follows the dinner gap", () => {
+  const d = day();
+  d.timeline.work = [T("19:00"), T("31:00")];
+  d.timeline.lights = T("21:30");
+  d.timeline.items.find((i) => i.id === "dinner").t = T("18:00");
+  d.log = { lunch: { status: "eaten", ate_at: "16:00" }, snack: { status: "skipped" } };
+  const live = liveDay(d, { now: T("16:05") });
+  assert.equal(at(live, "dinner").at, "18:00");            // 2½ h after lunch would be 18:30 — work wins
+  assert.match(at(live, "dinner").why, /before you clock in/);
+});
+
+test("a snack right before a lift he pinned moves to after it", () => {
+  const d = day({ session_log: { strength_a: { status: "moved", at: "16:45" } } });
+  d.timeline.items.find((i) => i.id === "snack").t = T("16:30");
+  const live = liveDay(d, { now: T("13:00") });
+  assert.equal(at(live, "snack").at, "18:00");               // lift 16:45–17:45 → +15
+  assert.match(at(live, "snack").why, /after the lift/);
+});
+
+test("protein top-ups go to his own food, not a meal at hers", () => {
+  const d = day({ log: { breakfast: { status: "swapped", swap: { what: "leftovers", kcal: 650, protein: 20, carbs: 60, fat: 30 } } } });
+  d.timeline.items.find((i) => i.id === "dinner").company = "away";
+  const live = liveDay(d, { now: T("09:00"), floor: 200 });
+  const where = live.balance.adjustments.map((a) => a.id);
+  assert.ok(where.length && !where.includes("dinner"));
+});

@@ -29,6 +29,10 @@ if (DEV) {
           kcal: 980, protein: 62, carbs: 118, fat: 30, uses: {}, pantry_used: ["ribeye"], why: "Uses the steak; a little more fat than the chili." },
         { title: "Salmon plate + extra rice", what: "Salmon plate (Recipe 5) + 1 cup rice", how: ["Thaw 15 min", "Roast 10 + 8 min"],
           kcal: 850, protein: 50, carbs: 113, fat: 22, uses: { salmon: 1 }, pantry_used: [], why: "Lighter; fish for the week." }] } }
+    : req.kind === "estimate" ? { id: req.id, kind: "estimate", status: "done", result: {
+        confidence: "medium", note: "Dev estimate: assumed ~1½ cups of stew + 1 injera per meal.",
+        items: (req.rows?.length ? req.rows : [{ slot: null }]).map((r) => ({ slot: r.slot, what: `Dev: leftovers (${r.slot || "extra"})`,
+          kcal: 650, protein: 38, carbs: 55, fat: 30 })) } }
     : req.kind === "ask" ? { id: req.id, kind: "ask", status: "done", result: {
         question: req.text, about: req.about || null, ops: /hers/i.test(req.text) ? [{ op: "company", date: req.date, slot: "dinner", who: "away" }] : [],
         answer: "Dev answer: the tendon shot is the collagen in the OJ — the rice cakes and honey stay. Eat them right after the LIC.", flag: "" } }

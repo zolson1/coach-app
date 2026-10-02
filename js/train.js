@@ -2,7 +2,7 @@
 // ramps with plate math, RPE logging with in-session load cuts, rest / hold /
 // guided-sequence timers, calibration ladders, notes.
 import { S, A, INPUTS, SHEETS, L, T, store, root, bar, esc, today, save, policy, queue, doneLog,
-  header, flashHTML, render, renderSheet, flushAll, fuel } from "./core.js";
+  header, flashHTML, render, renderSheet, flushAll, fuel, send } from "./core.js";
 import { matCard, mobilityCard } from "./mat.js";
 const fuelDay = (iso) => fuel()?.days.find((d) => d.date === iso) || null;
 
@@ -448,6 +448,11 @@ Object.assign(A, {
     store.set("queue", [...queue(), log]);
     done[id] = { key: a.key, date: a.date };
     store.set("done", done);
+    const st = new Date(a.started);
+    if (!Number.isNaN(st.getTime()) && ["strength_a", "strength_b", "domain"].includes(a.key)) {
+      send({ op: "session_log", date: a.date, session: a.key, status: "done",
+        at: `${String(st.getHours()).padStart(2, "0")}:${String(st.getMinutes()).padStart(2, "0")}` });
+    }
     S.active = null; save();
     T.stop(false); T.keepAwake(false);
     S.view = null; S.tab = "train";

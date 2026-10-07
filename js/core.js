@@ -65,7 +65,7 @@ export const S = {
   kitchenTab: store.get("kitchenTab") || "stock",
 };
 if (S.active) S.view = "session";
-T.setPrefs({ sound: S.settings.sound, vibrate: S.settings.vibrate });
+T.setPrefs({ sound: S.settings.sound, vibrate: S.settings.vibrate, background: S.settings.background !== false });
 
 // ------------------------------------------------------------------ helpers
 export const esc = (x) => String(x ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));

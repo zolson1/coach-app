@@ -104,3 +104,14 @@ test("Breacher: a slowed rep on a speed-governed lift ends it at once", async ()
   L.applyAdjustment(sets, 0, slow);
   assert.deepEqual(sets.slice(1).map((x) => x.skipReason), ["ended — speed dropped", "ended — speed dropped"]);
 });
+
+test("light work offers a TM check on a 7.5/8 week — never on the 75% week, never for one easy set", async () => {
+  const L = await import("../js/logic.js");
+  const pol = { check_margin: 3, check_min_cap: 7.5 };
+  const lift = (cap, rpes) => ({ type: "lift", tm: 320, rpe_cap: cap, calibrate: null,
+    work: rpes.map((r) => ({ load: 255, reps: 5, rpe: r, done: true })) });
+  assert.equal(L.lightCheck(lift(7.5, [4, 4.5, 4]), pol), true);
+  assert.equal(L.lightCheck(lift(7, [3, 3, 3]), pol), false);        // week 1: light by design
+  assert.equal(L.lightCheck(lift(7.5, [4, 6, 4]), pol), false);
+  assert.equal(L.lightCheck({ ...lift(8, [4, 4]), calibrate: { kind: "provisional" } }, pol), false);
+});

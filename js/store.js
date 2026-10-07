@@ -31,6 +31,7 @@ export const DEFAULT_SETTINGS = {
   plates: [45, 35, 25, 10, 5, 2.5],
   sound: true,
   vibrate: true,
+  background: true,
 };
 
 export function settings() {

@@ -92,6 +92,18 @@ export function afterWorkSet(block, liftState, entry, policy) {
   return res;
 }
 
+// A lift whose work sets ALL came in well under a 7.5/8 cap: worth one top set to
+// check the TM (the 75% weeks are light by design, so never there). Low RPEs alone
+// never move a TM — the top set at RPE 8 does, through the calibration math.
+export function lightCheck(block, policy) {
+  if (block.type !== "lift" || block.calibrate || block.speed_rule || block.log_as || !block.tm) return false;
+  const cap = capFor(block, policy);
+  if (cap < (policy?.check_min_cap ?? 7.5)) return false;
+  const done = block.work.filter((w) => w.done);
+  if (done.length < 2 || block.work.some((w) => !w.done && !w.skipped)) return false;
+  return done.every((w) => w.rpe != null && !w.slowed && w.rpe <= cap - (policy?.check_margin ?? 3));
+}
+
 // Apply an afterWorkSet result to the remaining sets of a lift (mutates sets).
 export function applyAdjustment(sets, fromIdx, res) {
   for (let i = fromIdx + 1; i < sets.length; i++) {

@@ -9,6 +9,24 @@ let prefs = { sound: true, vibrate: true };
 
 export function setPrefs(p) { prefs = { ...prefs, ...p }; }
 
+// ------------------------------------------------- ringing from the background
+// The service worker rings when a rest ends and the app isn't on screen (sw.js).
+function toWorker(msg) {
+  try { navigator.serviceWorker?.controller?.postMessage(msg); } catch { /* no worker (dev, http) */ }
+}
+export function notifyState() {
+  return typeof Notification === "undefined" ? "unsupported" : Notification.permission;
+}
+export async function askToNotify() {
+  if (typeof Notification === "undefined" || Notification.permission !== "default") return notifyState();
+  try { return await Notification.requestPermission(); } catch { return notifyState(); }
+}
+function handOff(t) {
+  if (!t || t.mode !== "down" || t.kind !== "rest" || prefs.background === false) return;
+  if (notifyState() === "default") askToNotify();          // the set-logging tap is the gesture it needs
+  toWorker({ type: "rest", id: String(t.startAt), endAt: t.endAt, next: t.next || null });
+}
+
 export function unlockAudio() {
   try {
     if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -79,6 +97,7 @@ export function start(t) {
   stop(false);
   const now = Date.now();
   current = { ...t, startAt: now, endAt: t.mode === "down" ? now + t.secs * 1000 : null, beeped: new Set() };
+  handOff(current);
   tick = setInterval(step, 200);
   emit();
   step();
@@ -89,6 +108,7 @@ export function adjust(deltaS) {
   current.endAt += deltaS * 1000;
   current.secs = Math.max(1, current.secs + deltaS);
   current.beeped = new Set([...current.beeped].filter((k) => k !== "end"));
+  handOff(current);
   emit();
 }
 
@@ -99,6 +119,7 @@ export function stop(fire = true) {
   clearInterval(tick);
   const c = current;
   current = null;
+  if (c.kind === "rest") toWorker({ type: "rest-cancel", id: String(c.startAt) });
   emit();
   if (fire && c.onStop) c.onStop(st.elapsed);
   return st.elapsed;

@@ -117,7 +117,7 @@ function liftHTML(b, i) {
     ${b.calibrate?.kind === "no_tm" ? ladderHTML(b, i) : ""}
     ${rows ? `<div class="rows">${rows}</div>` : ""}
     ${adj}
-    ${b.calibrate?.kind === "provisional" && complete ? (b.state.adjustments?.length && !b.state.ladder.length
+    ${["provisional", "check"].includes(b.calibrate?.kind) && complete ? (b.state.adjustments?.length && !b.state.ladder.length
       ? `<p class="muted small">TM calibration skipped today — your sets ran over the cap, so the safety valve is already watching this TM.</p>`
       : ladderHTML(b, i)) : ""}
     <textarea class="note" data-a="note" data-b="${i}" rows="1" placeholder="Note for next time (knee, grip, setup…)">${esc(b.state.note)}</textarea>
@@ -257,6 +257,11 @@ function saveSheet() {
     const res = L.afterWorkSet(b, b.state, { ...w, target_reps: w.target_reps }, policy());
     L.applyAdjustment(b.work, sh.s, res);
     if (res.reason) (b.state.adjustments ||= []).push({ after_set: sh.s + 1, level: res.level, reason: res.reason, to: res.newLoad });
+    if (L.lightCheck(b, policy())) {
+      b.calibrate = { kind: "check", reps: "3–5", target_rpe: 8, jump: b.step_lb || 10,
+        start: L.r5(w.load * 1.1) || 10,
+        text: `Every set moved easily (well under today's RPE ${b.rpe_cap} cap). Optional: climb in ${b.step_lb || 10}-lb jumps to ONE top set of 3–5 @ RPE 8 — crisp, never a grind — and the TM recalibrates from it (±15% max). Skip it and nothing changes.` };
+    }
     const nextLabel = nextUp();
     if (nextLabel) startRest(res.restS, nextLabel);
   }

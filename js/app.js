@@ -100,6 +100,10 @@ function viewSettings() {
       `<label class="chip"><input type="checkbox" class="set-plate" value="${p}" ${s.plates.includes(p) ? "checked" : ""}> ${p}</label>`).join("")}</fieldset>
     <label class="chip"><input type="checkbox" id="set-sound" ${s.sound ? "checked" : ""}> Timer beeps</label>
     <label class="chip"><input type="checkbox" id="set-vib" ${s.vibrate ? "checked" : ""}> Vibrate</label>
+    <label class="chip wide"><input type="checkbox" id="set-bg" ${s.background !== false ? "checked" : ""}> Ring when I'm in another app (a notification at the end of each rest)</label>
+    <p class="muted small">Notifications: <b>${esc({ granted: "allowed", denied: "blocked — allow them for this site in Chrome's settings", default: "not asked yet", unsupported: "not supported here" }[T.notifyState()])}</b></p>
+    <div class="toolrow">${T.notifyState() === "default" ? `<button class="btn sm" data-a="asknotify">Allow notifications</button>` : ""}
+      <button class="btn sm" data-a="testrest">Test: ring in 10 s (switch apps now)</button></div>
     <button class="btn primary big" data-a="savesettings">Save</button></section>
     ${rem ? `<section class="card"><h2>Today's reminders</h2>
       <p class="muted small">What your phone's notifications will say (set up in MacroDroid).</p>
@@ -137,11 +141,13 @@ Object.assign(A, {
     S.settings = { ...S.settings, token: g("set-token").value.trim(), repo: g("set-repo").value.trim(),
       barbell: Number(g("set-barbell").value) || 45, trapBar: Number(g("set-trap").value) || 45,
       plates: [...document.querySelectorAll(".set-plate")].filter((x) => x.checked).map((x) => Number(x.value)),
-      sound: g("set-sound").checked, vibrate: g("set-vib").checked };
+      sound: g("set-sound").checked, vibrate: g("set-vib").checked, background: g("set-bg").checked };
     store.saveSettings(DEV ? { ...S.settings, token: "" } : S.settings);
-    T.setPrefs({ sound: S.settings.sound, vibrate: S.settings.vibrate });
+    T.setPrefs({ sound: S.settings.sound, vibrate: S.settings.vibrate, background: S.settings.background });
     S.view = null; render(); refreshPlan();
   },
+  async asknotify() { await T.askToNotify(); render(); },
+  testrest() { T.unlockAudio(); T.start({ kind: "rest", label: "Test rest", next: "This was a test — the timer works in the background", mode: "down", secs: 10 }); },
 });
 
 function onClick(e) {

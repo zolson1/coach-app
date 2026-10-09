@@ -55,8 +55,39 @@ function stock(f) {
     }).join("")}
     <p class="muted small">The cards count these down each morning. Fix a number whenever the freezer disagrees.</p>
   </section>`;
+  html += larderCard(f);
   return html;
 }
+
+// ------------------------------------------------------------------ larder
+// The raw ingredients behind the cooks and the cards (coach/larder.py): counted
+// once, drawn down by every cook and every morning's card, topped up by what's
+// ticked off the list.
+const SHELF = { freezer: "Freezer", fridge: "Fridge", pantry: "Pantry", counter: "Counter" };
+function larderCard(f) {
+  const L = f.kitchen.larder;
+  if (!L) return "";
+  const items = Object.entries(L.items);
+  const groups = Object.keys(SHELF).map((sh) => [sh, items.filter(([, v]) => v.shelf === sh)]).filter(([, g]) => g.length);
+  return `<section class="card"><div class="lift-head"><h2>Larder — raw ingredients</h2><button class="btn sm" data-a="lardercount">Count</button></div>
+    ${L.counted ? "" : `<p class="adj">Not counted yet. Count what's on hand once (tap Count) — from then cooks and meals draw it down on their own, and the shopping lists turn exact.</p>`}
+    ${groups.map(([sh, g]) => `<h3 class="sub">${SHELF[sh]}</h3>${g.map(([k, v]) => `<button class="batch row-btn" data-a="larderset" data-k="${esc(k)}">
+      <div class="b-main"><b>${esc(v.label)}</b><span class="muted small">${v.pending ? "updating…" : v.runs_out ? `runs out ${esc(when(v.runs_out))}${v.urgent ? " — before the next trip" : ""}` : v.have == null ? "not counted" : `${esc(v.need_txt)} needed by ${esc(when(v.until))}`}</span></div>
+      <span class="count ${v.urgent ? "warn-text" : ""}">${esc(v.have == null ? "—" : v.have_txt)}</span></button>`).join("")}`).join("")}
+    <p class="muted small">Logging a cook takes its recipe's ingredients; each morning's card takes its fresh staples; a skip gives them back.</p>
+  </section>`;
+}
+
+SHEETS.larder = (sh) => {
+  const L = fuel().kitchen.larder;
+  const keys = sh.k ? [sh.k] : Object.keys(L.items);
+  return `<div class="sheet"><h3>${sh.k ? esc(L.items[sh.k].label) : "Count the larder"}</h3>
+    <p class="muted small">What's actually there. Leave one blank to skip it.</p>
+    <div class="countgrid">${keys.map((k) => { const v = L.items[k]; return `<label class="fld">${esc(v.label)} <span class="muted small">(${esc(v.unit === "each" ? "count" : v.unit)})</span>
+      <input type="number" inputmode="decimal" step="any" data-k="${esc(k)}" class="larderin" value="${v.have == null ? "" : esc(v.have)}"></label>`; }).join("")}</div>
+    <div class="sheet-foot"><button class="btn ghost" data-a="closesheet">Cancel</button>
+      <button class="btn primary" data-a="lardersave">Save</button></div></div>`;
+};
 
 SHEETS.cooked = () => {
   const f = fuel();
@@ -86,10 +117,34 @@ function checklist(list, items, checked) {
     <span>${esc(it.item)}${it.qty && it.qty !== "—" ? ` <i class="muted">· ${esc(it.qty)}</i>` : ""}</span></div>`).join("")}</div>`;
 }
 
+function buyList(f) {
+  const L = f.kitchen.larder;
+  if (!L) return "";
+  const bought = store.get("bought", {});
+  const sec = (trip, title) => {
+    const lines = L.lists[trip] || [];
+    const date = L.trips?.[trip]?.[0];
+    if (!lines.length) return "";
+    return `<h3 class="sub">${title}${date ? ` · ${esc(when(date))}` : ""}</h3><div class="tasks">${lines.map((x) => {
+      const got = bought[`${x.key}:${x.buy}`];
+      return `<div class="check ${got ? "done" : ""}"><button class="tick" data-a="bought" data-k="${esc(x.key)}" data-q="${esc(x.buy)}">${got ? "✓" : ""}</button>
+        <span><b>${esc(x.label)}</b> — ${esc(x.buy_txt)} <i class="muted">(${esc(x.sold)})</i>
+        <span class="muted small">· ${x.have == null ? "" : `have ${esc(x.have_txt)} · `}${esc(x.need_txt)} needed by ${esc(when(x.until))}</span>
+        ${x.urgent ? `<span class="warn-text small"> · runs out ${esc(when(x.runs_out))} — before this trip, grab it sooner</span>` : ""}</span></div>`;
+    }).join("")}</div>`;
+  };
+  const body = sec("topup", "Fresh top-up") + sec("haul", "Costco haul");
+  return `<section class="card"><div class="lift-head"><h2>What to buy</h2><button class="btn sm" data-a="lardercount">Count</button></div>
+    ${L.counted ? `<p class="muted small">From the larder: what the cooks and cards will use until the trip after next, minus what you have.</p>`
+      : `<p class="adj">The larder isn't counted yet, so these are the full need, not minus what you have — count it once (Kitchen → Stock) to make them exact.</p>`}
+    ${body || emptyState("Nothing to buy before the next trips.")}
+    <p class="muted small">Ticking a line adds it to the larder.</p></section>`;
+}
+
 function shop(f) {
   const s = f.shopping;
   const stores = [...new Set(s.haul.items.map((x) => x.where))];
-  let html = "";
+  let html = buyList(f);
   if (s.suggestions.length) {
     html += `<section class="card alert"><h2>Worth adding</h2>${s.suggestions.map((x) =>
       `<p class="line"><b>${esc(x.item)}</b> <span class="muted">· ${esc(x.qty)} · ${esc(x.why)}</span></p>`).join("")}</section>`;
@@ -106,11 +161,12 @@ function shop(f) {
     ${checklist("topup", s.topup.items, s.topup.checked)}
     <button class="btn" data-a="topupdone">Top-up done</button>
     ${s.topup.last ? `<p class="muted small">Last one ${esc(when(s.topup.last))}.</p>` : ""}</section>`;
+  html += `<details class="card cues"><summary>The plan's full lists (reference)</summary>`;
   html += `<section class="card"><div class="lift-head"><h2>The 28-day haul</h2>
       <span class="tm">${s.haul.next ? `next ${esc(when(s.haul.next.date))} · ` : ""}≈$${fmtNum(s.haul.total_est)}</span></div>
     ${stores.map((st) => `<h3 class="sub">${esc(st)}</h3>${checklist("haul", s.haul.items.filter((x) => x.where === st), s.haul.checked)}`).join("")}
     <button class="btn" data-a="hauldone">Haul done — stock the counts</button>
-    ${s.haul.last ? `<p class="muted small">Last haul ${esc(when(s.haul.last))}.</p>` : ""}</section>`;
+    ${s.haul.last ? `<p class="muted small">Last haul ${esc(when(s.haul.last))}.</p>` : ""}</section></details>`;
   return html;
 }
 
@@ -309,6 +365,27 @@ Object.assign(A, {
     if (Number.isFinite(n)) send({ op: "kitchen_set", item: k, count: Math.max(0, Math.round(n)) });
   },
   cookedsheet() { sheet({ type: "cooked" }); },
+  lardercount() { sheet({ type: "larder" }); },
+  larderset(d) { sheet({ type: "larder", k: d.k }); },
+  lardersave() {
+    const items = {};
+    for (const el of document.querySelectorAll(".larderin")) {
+      const k = el.dataset.k, v = el.value.trim();
+      const had = fuel().kitchen.larder.items[k]?.have;
+      if (v === "" && had == null) continue;
+      if (v !== "" && Number(v) === had) continue;
+      items[k] = v === "" ? null : Number(v);
+    }
+    sheet(null);
+    if (Object.keys(items).length) send({ op: "larder_set", items, date: today() });
+  },
+  bought(d) {
+    const all = store.get("bought", {});
+    const id = `${d.k}:${d.q}`;
+    const on = !all[id];
+    store.set("bought", { ...Object.fromEntries(Object.entries(all).slice(-60)), [id]: on });
+    send({ op: "larder_add", item: d.k, qty: on ? Number(d.q) : -Number(d.q), date: today() });
+  },
   savecooked() {
     const sel = document.getElementById("ckitem");
     const n = Number(val("ckn")) || Number(sel.selectedOptions[0].dataset.y) || 1;

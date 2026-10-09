@@ -380,3 +380,5 @@ button.tl-row:active { background: var(--card-2); }
 .workrow:first-of-type { border-top: 0; }
 .workrow p { margin: 0 0 6px; }
 .option.on { border-color: var(--accent); outline: 2px solid var(--accent); }
+.row-btn { width: 100%; text-align: left; border: 0; background: transparent; color: inherit; font: inherit; }
+.countgrid { display: grid; gap: 8px; max-height: 55vh; overflow-y: auto; margin-bottom: 8px; }

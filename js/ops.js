@@ -197,6 +197,21 @@ export function applyOps(f, ops, ctx = {}) {
         else d.mat_log[o.slot] = { status: o.status, ...(o.class ? { class: o.class } : {}), ...(o.note ? { note: o.note } : {}) };
         break;
       }
+      case "larder_set":
+      case "larder_add": {            // the larder's number moves now; what to buy re-figures on sync
+        const L = f.kitchen?.larder;
+        if (!L) break;
+        const items = o.items || (o.item ? { [o.item]: o.qty } : {});
+        for (const [k, q] of Object.entries(items)) {
+          const v = L.items[k];
+          if (!v) continue;
+          v.have = o.op === "larder_set" ? (q == null ? null : Number(q)) : Math.max(0, (v.have || 0) + Number(q));
+          v.have_txt = v.have == null ? "—" : `${Math.round(v.have * 10) / 10}${v.unit === "each" ? "" : ` ${v.unit}`}`;
+          v.pending = true;
+          if (o.op === "larder_set") L.counted = true;
+        }
+        break;
+      }
       case "leave": {                 // the day re-plans on the coach's side; show it's coming
         const d = day(o.date);
         if (d) d.leave_pending = o.part;

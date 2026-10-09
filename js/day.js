@@ -7,7 +7,7 @@
 //    re-times and rebalances itself.
 import { S, A, INPUTS, SHEETS, esc, fuel, send, sheet, renderSheet, render, today, ask, requests, uid, fmtNum } from "./core.js";
 import { dayOf, dayLabel, macroLine } from "./ui.js";
-import { liveDay, hm, toMin } from "./timeline.js";
+import { liveDay, hm, toMin, workBlock, earlyLights } from "./timeline.js";
 
 export const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
 const EAT = new Set(["meal", "snack", "during", "extra"]);
@@ -32,7 +32,9 @@ function tlRow(d, i) {
   const time = `${esc(i.at)}${i.until && ["train", "work"].includes(i.kind) ? `<span class="muted">–${esc(i.until)}</span>` : ""}`;
   const r = i.slot ? rowFor(d, i.slot) : null;
   const notes = [
-    i.why && (i.moved || ["squeezed", "fold"].includes(i.status) || i.tight) ? i.why : null,
+    i.at_work ? i.work_note : null,
+    i.why && (i.moved || ["squeezed", "fold"].includes(i.status) || i.tight || i.kind === "work") ? i.why : null,
+    i.late && !i.at_work && !i.status ? `If relief runs late: ${i.late.replace(/^Still at the station: /, "")}` : null,
     ...(i.adjust || []), ...(i.notes || []),
     r?.company === "shared" && r.for_two ? r.for_two : null,
     r?.company === "away" && r.away_note ? r.away_note : null,
@@ -41,7 +43,8 @@ function tlRow(d, i) {
   const label = i.kind === "train" || i.kind === "sleep" || i.kind === "work" ? i.label : (i.label || i.what);
   const act = eating && i.slot && d.card?.rows.some((x) => x.slot === i.slot) ? `data-a="rowsheet" data-date="${d.date}" data-slot="${esc(i.slot)}"`
     : i.kind === "train" && i.train === "mat" ? `data-a="classsheet" data-date="${d.date}" data-slot="${esc(i.session.replace(/^mat_/, ""))}"`
-    : i.kind === "train" ? `data-a="sesssheet" data-date="${d.date}" data-id="${esc(i.id)}"` : "";
+    : i.kind === "train" ? `data-a="sesssheet" data-date="${d.date}" data-id="${esc(i.id)}"`
+    : i.kind === "work" && i.block ? `data-a="worksheet" data-block="${esc(i.block)}" data-day="${d.date}"` : "";
   const Tag = act ? "button" : "div";
   return `<${Tag} class="tl-row ${esc(i.kind)} ${esc(i.status || "")} ${i.next ? "next" : ""}" ${act}>
     <span class="tl-t">${time}${i.moved ? `<s>${esc(hm(i.ideal))}</s>` : ""}</span>
@@ -74,6 +77,64 @@ export function nextOf(d) {
   const L = live(d);
   return L?.next ? { item: L.next, live: L } : null;
 }
+
+// ------------------------------------------------------------ work: report and relief
+const WHERE_TXT = { home: "Home station", detail: "Detail" };
+const hmDay = (m) => `${hm(m)}${m >= 1440 ? " (next day)" : m < 0 ? " (day before)" : ""}`;
+
+function blockOf(d, date) {
+  for (const k of ["today", "relief", "tomorrow"]) if (d?.work?.[k]?.date === date) return { key: k, b: workBlock(d.work[k]) };
+  return null;
+}
+
+// Today's work, if any: the block that started today, the one being relieved today,
+// or tomorrow's report (which sets tonight's lights out).
+export function workCard(d) {
+  const w = d?.work || {};
+  const now = nowMin();
+  const rows = [];
+  const relief = w.relief && workBlock(w.relief);
+  const today = w.today && workBlock(w.today);
+  const tom = w.tomorrow && workBlock(w.tomorrow);
+  for (const b of [relief, today]) {
+    if (!b) continue;
+    const done = b.actual != null;
+    const endsToday = b.relief < 1440;
+    rows.push(`<div class="workrow"><p><b>${esc(WHERE_TXT[b.where])}</b> · ${esc(b.type === "SHIFT" ? "24" : b.type === "OT-DAY" ? "OT day" : "OT night")}
+      — ${b.report >= 0 ? `report ${esc(hm(b.report))} · ` : ""}${done ? `relieved ${esc(hm(b.actual))}` : `relief ≈${esc(hmDay(b.relief))}`}
+      ${!done && endsToday ? `<span class="muted"> · late: ${esc(hm(b.late))}+</span>` : ""}</p>
+      <div class="toolrow">${endsToday && !done && now >= b.report ? `<button class="btn sm primary" data-a="relievednow" data-block="${esc(b.date)}">Relieved now</button>
+        <button class="btn sm" data-a="worksheet" data-block="${esc(b.date)}" data-day="${d.date}" data-late="1">Running late…</button>` : ""}
+        <button class="btn sm ghost" data-a="worksheet" data-block="${esc(b.date)}" data-day="${d.date}">Edit</button></div></div>`);
+  }
+  if (tom && ["SHIFT", "OT-DAY"].includes(tom.type) && !(today && ["SHIFT", "OT-NIGHT"].includes(today.type))) {
+    rows.push(`<div class="workrow"><p><b>Tomorrow</b> · ${esc(WHERE_TXT[tom.where])} — report ${esc(hm(tom.report))}
+      <span class="muted">· lights out tonight ≈${esc(hm(earlyLights(tom.report - 1440)))}</span></p>
+      <div class="toolrow"><button class="btn sm ghost" data-a="worksheet" data-block="${esc(tom.date)}" data-day="${d.date}">${tom.where === "home" ? "On a detail?" : "Edit"}</button></div></div>`);
+  }
+  return rows.length ? `<section class="card"><h2>Work</h2>${rows.join("")}</section>` : "";
+}
+
+SHEETS.work = (sh) => {
+  const d = dayOf(sh.day);
+  const got = blockOf(d, sh.block);
+  if (!got) return "";
+  const b = got.b;
+  const set = b.set || {};
+  const off = b.offset || 0;
+  const t = (m) => hm(m);
+  const endsNextDay = b.type !== "OT-DAY";
+  return `<div class="sheet"><h3>Work — ${esc(dayLabel(sh.block))} (${esc(b.type === "SHIFT" ? "24" : b.type === "OT-DAY" ? "OT day" : "OT night")})</h3>
+    <div class="segs">${["home", "detail"].map((k) => `<button class="seg ${b.where === k ? "on" : ""}" data-a="workwhere" data-w="${k}">${WHERE_TXT[k]}</button>`).join("")}</div>
+    <p class="muted small">Home station: report/relief 03:30 or 15:30 · detail: 05:30 or 17:30 · late relief at the 07:00 / 19:00 change or later.${b.where_from && b.where_from.startsWith("calendar") ? ` (${esc(b.where_from)})` : ""}</p>
+    <div class="two"><label class="fld">Report<input type="time" id="wkreport" value="${esc(t(b.report - off))}"></label>
+      <label class="fld">Expected relief${endsNextDay ? " (next day)" : ""}<input type="time" id="wkrelief" value="${esc(t(b.relief))}"></label></div>
+    ${sh.late ? `<p class="adj">Running late? Set when you now expect to be relieved — the meals and training after it switch to the late-relief plan.</p>` : ""}
+    <label class="fld">Actually relieved at${endsNextDay ? " (next day)" : ""}<input type="time" id="wkactual" value="${esc(set.relieved_at || "")}"></label>
+    <div class="sheet-foot"><button class="btn ghost" data-a="workclear">Back to the defaults</button>
+      <button class="btn primary" data-a="worksave">Save</button></div>
+    <button class="btn ghost" data-a="closesheet">Close</button></div>`;
+};
 
 // ------------------------------------------------------------ training time
 SHEETS.sess = (sh) => {
@@ -156,6 +217,32 @@ Object.assign(INPUTS, {
 });
 
 Object.assign(A, {
+  worksheet(d) { sheet({ type: "work", block: d.block, day: d.day || today(), late: !!d.late }); },
+  workwhere(d) {
+    const sh = S.sheet;
+    send({ op: "work_set", date: sh.block, where: d.w });
+    renderSheet();
+  },
+  worksave() {
+    const sh = S.sheet;
+    const got = blockOf(dayOf(sh.day), sh.block);
+    if (!got) return;
+    const b = got.b, off = b.offset || 0;
+    const val = (id) => document.getElementById(id)?.value || "";
+    const op = { op: "work_set", date: sh.block };
+    const rep = val("wkreport"), rel = val("wkrelief"), act = val("wkactual");
+    if (rep && rep !== hm(b.report - off)) op.report = rep;
+    if (rel && rel !== hm(b.relief)) op.relief = rel;
+    if (act !== (b.set?.relieved_at || "")) op.relieved_at = act || null;
+    sheet(null);
+    if (Object.keys(op).length > 2) send(op);
+  },
+  workclear() {
+    const sh = S.sheet;
+    sheet(null);
+    send({ op: "work_set", date: sh.block, clear: true });
+  },
+  relievednow(d) { send({ op: "work_set", date: d.block, relieved_at: hm(nowMin()) }); },
   sesssheet(d) { sheet({ type: "sess", date: d.date, id: d.id }); },
   sessmark(d) {
     const sh = S.sheet;

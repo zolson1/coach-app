@@ -6,7 +6,7 @@ import { dayTotals, nextRow } from "./ops.js";
 import { sessionButton } from "./train.js";
 import { matCard, mobilityCard } from "./mat.js";
 import { fixPending } from "./fix.js";
-import { timelineCard, nextOf } from "./day.js";
+import { timelineCard, nextOf, workCard } from "./day.js";
 
 export function viewToday() {
   const p = S.plan;
@@ -29,6 +29,7 @@ export function viewToday() {
       <div class="meter" title="protein"><i style="width:${Math.min(100, (tot.protein / (f.protein_floor || 200)) * 100)}%"></i></div>
       <p class="muted small">${tot.logged} of ${tot.rows} meals logged · ${tot.protein} of ${f.protein_floor} g protein</p></section>`;
 
+    html += workCard(d);
     const now = new Date();
     const dinner = d.card.rows.find((r) => r.slot === "dinner" && r.company && !d.log?.[r.slot]);
     const nx = nextOf(d);

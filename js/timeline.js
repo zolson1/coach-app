@@ -85,6 +85,91 @@ function applyLogs(items, day, ctx) {
   }
 }
 
+// ------------------------------------------------------------------ work
+// Report and relief (mirrors coach/work.py): home station 03:30 / 15:30, a detail
+// 05:30 / 17:30, late relief at the official 07:00 / 19:00 change or later.
+const EARLY = { home: 210, detail: 90 };
+const CHANGE = { day: 420, night: 1140 };
+const SPANS = { SHIFT: ["day", "day", 1], "OT-DAY": ["day", "night", 0], "OT-NIGHT": ["night", "day", 1] };
+
+// A block recomputed from its type and what he's set — so a change shows at once.
+export function workBlock(b) {
+  const span = b && SPANS[b.type];
+  if (!span) return b || null;
+  const set = b.set || {};
+  const where = set.where || b.where || "home";
+  const [start, end, off] = span;
+  const o = b.offset || 0;
+  const day = 1440 * off;
+  const report = (set.report ? toMin(set.report) : CHANGE[start] - EARLY[where]) + o;
+  const nominal = CHANGE[end] + day + o;
+  const planned = CHANGE[end] + day - EARLY[where] + o;          // the early relief his station usually gives
+  const relief = set.relief ? toMin(set.relief) + day + o : planned;
+  const late = relief < nominal ? nominal : relief + 120;
+  const actual = set.relieved_at ? toMin(set.relieved_at) + day + o : null;
+  return { ...b, where, report, relief, planned, nominal, late, actual };
+}
+export const earlyLights = (reportNext) => reportNext + 1440 - (reportNext < 300 ? 450 : 480);
+
+// Apply the day's work blocks: the work rows, tonight's lights out before a dawn
+// report, the relief morning's wake, and what a late relief does to the day.
+function applyWork(items, day, tl, R) {
+  const w = day.work || {};
+  const today = w.today ? workBlock(w.today) : null;
+  const relief = w.relief ? workBlock(w.relief) : null;
+  const tom = w.tomorrow ? workBlock(w.tomorrow) : null;
+  const station = R.station_alt || {};
+  const where = (b) => (b.where === "home" ? "home station" : "detail");
+  let lights = tl.lights;
+  let work = tl.work;
+  if (tom && ["SHIFT", "OT-DAY"].includes(tom.type) && !(today && ["SHIFT", "OT-NIGHT"].includes(today.type))) {
+    lights = earlyLights(tom.report - 1440);
+  }
+  const blocks = [];
+  for (const [id, b] of [["relief", relief], ["work", today]]) {
+    if (!b) continue;
+    const eff = b.actual ?? b.relief;
+    blocks.push({ ...b, eff });
+    const it = items.find((x) => x.kind === "work" && x.id === id);
+    if (!it) continue;
+    it.t = Math.max(0, b.report); it.end = eff; it.relief = b.relief; it.late = b.late; it.actual = b.actual;
+    it.where = b.where; it.block = b.date;
+    it.label = id === "relief"
+      ? (b.actual != null ? `Relieved ${hm(b.actual)} (${where(b)})` : `On duty (${where(b)}) — relief ≈${hm(b.relief)}`)
+      : `Report — ${where(b)} · ${b.actual != null ? `relieved ${hm(b.actual)}` : `relief ≈${hm(b.relief)}${b.relief >= 1440 ? " tomorrow" : ""}`}`;
+    it.why = b.actual != null || b.relief >= 1440 + 360 ? null : `late relief: ${hm(b.late)} or later — the plan has a fallback`;
+    if (id === "work") work = [b.report, eff];
+  }
+  // the relief morning: relieved before 06:00 = home to a second sleep; later = straight into the day
+  if (relief) {
+    const r = relief.actual ?? relief.relief;
+    const eat = r <= 360 ? Math.max(450, r + 240) + 15 : up(r + 30, R.round || 15);   // after a second sleep / when home
+    for (const it of items) {
+      if (!it.status && /waking/i.test(it.planned_time || "") && EATING.has(it.kind) && it.t !== eat) {
+        it.t = eat;
+        if (r > 360) it.why = "relieved late — no second sleep, eat when you're home";
+      }
+    }
+  }
+  // inside a work window and planned for after the expected relief → at work now (late relief)
+  for (const b of blocks) {
+    if (b.eff <= b.planned || b.planned >= 1440 + 360) continue;        // on time (or a next-day relief)
+    for (const it of items) {
+      if (it.status || it.t == null || it.t < b.planned || it.t >= b.eff + 30) continue;
+      if (EATING.has(it.kind) && it.slot && it.kind !== "during") {
+        it.at_work = true;
+        it.work_note = it.late || station[it.slot] || R.station_snack || "Still at the station: the Core Power from your kit.";
+      } else if (it.kind === "train" && it.train !== "mat") {
+        it.after_work = b.eff + 30;
+      } else if (it.kind === "train") {
+        it.at_work = true;
+        it.work_note = "Relieved late — this class is out; the mat card has the swaps.";
+      }
+    }
+  }
+  return { ...tl, lights, work, blocks };
+}
+
 // ------------------------------------------------------------------ re-time
 function retime(items, tl, ctx, R) {
   const now = ctx.now;
@@ -102,7 +187,7 @@ function retime(items, tl, ctx, R) {
     if (carried) { it.carried = true; continue; }
     const end = it.end ?? it.t;
     if (end <= now) it.status = "past";
-    else if (it.kind === "train" && it.t <= now) it.status = "now";
+    else if ((it.kind === "train" || it.kind === "work") && it.t <= now) it.status = "now";
   }
   const happened = items.filter((i) => ["done", "past", "now"].includes(i.status) && i.t != null);
   let lastMeal = Math.max(-Infinity, ...happened.filter((i) => i.kind === "meal" || (i.extra && i.meal)).map((i) => i.t));
@@ -134,16 +219,18 @@ function retime(items, tl, ctx, R) {
         if (lastEat > mealT()) earliest = Math.max(earliest, lastEat + R.lift_after_snack);
       } else if (it.train === "lic") earliest = Math.max(earliest, mealT() + R.lic_after_meal);
       earliest = Math.max(earliest, lastTrain + 15);
+      if (it.after_work) { earliest = Math.max(earliest, it.after_work); it.why = "after relief — you're still at work"; }
       const t = Math.max(it.t, up(earliest, R.round));
       if (t + dur > trainCut) {
         const latest = down(trainCut - dur, R.round);
         const settle = it.train === "lift" ? 60 : it.train === "lic" ? 45 : 0;   // the least a squeezed slot can give
-        if (latest >= cursor && latest >= mealT() + settle) {
+        if (latest >= cursor && latest >= mealT() + settle && !(it.after_work && latest < it.after_work)) {
           it.t = latest; it.end = latest + dur; it.tight = true;
           it.why = `start by ${hm(latest)} to be done ${eveningWork != null && trainCut === eveningWork - R.train_before_work ? "before work" : "3 h before lights out"} — keep the meal before it small`;
         } else {
           it.status = "squeezed";
-          it.why = it.train === "lift" ? "no room left today — the priority stack says the Domain Day moves first; Zone 2 is the fallback"
+          it.why = it.after_work ? `relieved too late for it to finish ${trainCut === lights - R.train_before_lights ? "3 h before lights out" : "in time"} — it's off today`
+            : it.train === "lift" ? "no room left today — the priority stack says the Domain Day moves first; Zone 2 is the fallback"
             : "no room left before the evening cutoff";
         }
       } else {
@@ -312,7 +399,8 @@ export function liveDay(day, ctx = {}) {
   const R = { ...DEFAULT_RULES, ...(ctx.rules || {}) };
   const items = JSON.parse(JSON.stringify(tl.items));
   applyLogs(items, day, ctx);
-  retime(items, tl, { ...ctx, now: ctx.now ?? -1 }, R);
+  const clock = applyWork(items, day, tl, R);
+  retime(items, clock, { ...ctx, now: ctx.now ?? -1 }, R);
   const balance = rebalance(items, tl, ctx);
   for (const it of items) {
     it.at = hm(it.t);
@@ -322,5 +410,6 @@ export function liveDay(day, ctx = {}) {
   const live = items.filter((i) => i.t != null).sort((a, b) => a.t - b.t || (a.kind === "train" ? -1 : 1));
   const next = live.find((i) => !i.status && ["meal", "snack", "train"].includes(i.kind));
   if (next) next.next = true;
-  return { items: live, untimed: items.filter((i) => i.t == null), balance, next, lights: tl.lights, work: tl.work };
+  return { items: live, untimed: items.filter((i) => i.t == null), balance, next, lights: clock.lights, work: clock.work,
+    blocks: clock.blocks };
 }

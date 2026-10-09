@@ -107,3 +107,69 @@ test("protein top-ups go to his own food, not a meal at hers", () => {
   const where = live.balance.adjustments.map((a) => a.id);
   assert.ok(where.length && !where.includes("dinner"));
 });
+
+// ---- report and relief
+function otDay(set = {}) {
+  // an OT day at the home station: report 03:30, relief 15:30 expected, 19:00 late
+  return {
+    date: "2026-10-09", log: {}, session_log: {}, mat_log: {}, off_card: [],
+    work: { today: { date: "2026-10-09", type: "OT-DAY", where: "home", offset: 0, set }, relief: null, tomorrow: null },
+    timeline: {
+      wake: T("02:45"), lights: T("22:30"), work: [T("03:30"), T("15:30")], station: true, level: "F2",
+      targets: { kcal: 3000, protein: 220, carbs: 330, fat: 80 },
+      items: [
+        { id: "work", kind: "work", t: T("03:30"), end: T("15:30"), fixed: true },
+        { id: "lunch", slot: "lunch", kind: "meal", t: T("12:00"), kcal: 850, protein: 55, what: "Firehouse lunch" },
+        { id: "snack", slot: "snack", kind: "snack", t: T("16:00"), kcal: 230, protein: 42, what: "Core Power", late: "Still at the station: the Core Power Elite from your kit bag." },
+        { id: "lic", kind: "train", train: "lic", session: "lic", t: T("16:45"), end: T("17:30"), label: "Zone 2 (LIC)" },
+        { id: "dinner", slot: "dinner", kind: "meal", t: T("18:30"), kcal: 900, protein: 55, what: "Chili + rice", late: "Still at the station: the firehouse dinner if it's served…" },
+        { id: "lights", kind: "sleep", t: T("22:30") },
+      ],
+    },
+  };
+}
+
+test("relieved on time: the home plan, with the late fallback held in reserve", () => {
+  const live = liveDay(otDay(), { now: T("13:00") });
+  assert.equal(at(live, "work").end, T("15:30"));
+  assert.ok(!at(live, "dinner").at_work && at(live, "dinner").late);
+  assert.equal(at(live, "lic").at, "16:45");
+});
+
+test("expecting late relief: the station versions take over and training slides after relief", () => {
+  const live = liveDay(otDay({ relief: "19:00" }), { now: T("13:00") });
+  assert.equal(at(live, "work").end, T("19:00"));
+  assert.ok(at(live, "snack").at_work && /kit bag/.test(at(live, "snack").work_note));
+  assert.ok(at(live, "dinner").at_work && /firehouse dinner/.test(at(live, "dinner").work_note));
+  assert.equal(at(live, "lic").status, "squeezed");              // after 19:30 it can't finish 3 h before 22:30
+  assert.match(at(live, "lic").why, /relieved too late/);
+  const later = otDay({ relief: "17:30" });
+  assert.equal(at(liveDay(later, { now: T("13:00") }), "lic").at, "18:00");   // a 17:30 relief: it still fits
+});
+
+test("a detail moves report and relief; an actual relief wins over the expected one", () => {
+  const det = liveDay(otDay({ where: "detail" }), { now: T("06:00") });
+  assert.equal(at(det, "work").t, T("05:30"));
+  assert.equal(at(det, "work").end, T("17:30"));
+  const actual = liveDay(otDay({ relieved_at: "16:10" }), { now: T("16:20") });
+  assert.equal(at(actual, "work").end, T("16:10"));
+  assert.ok(at(actual, "snack").at_work);                         // 16:00 snack: still at the station
+  assert.ok(!at(actual, "dinner").at_work);
+});
+
+test("the relief morning: an 03:30 relief sleeps again, a late one eats when home", () => {
+  const relief = (set) => ({
+    date: "2026-10-11", log: {}, session_log: {}, mat_log: {}, off_card: [],
+    work: { today: null, tomorrow: null, relief: { date: "2026-10-10", type: "SHIFT", where: "home", offset: -1440, set } },
+    timeline: { wake: T("07:30"), lights: T("22:00"), work: null, station: false, level: "F3",
+      targets: { kcal: 3600, protein: 236, carbs: 500, fat: 75 },
+      items: [
+        { id: "relief", kind: "work", t: 0, end: T("03:30"), fixed: true },
+        { id: "breakfast", slot: "breakfast", kind: "meal", t: T("07:45"), planned_time: "on waking", kcal: 670, protein: 53, what: "Quick pre-mat breakfast" },
+        { id: "lights", kind: "sleep", t: T("22:00") }] },
+  });
+  assert.equal(at(liveDay(relief({}), { now: T("03:00") }), "breakfast").at, "07:45");
+  const late = liveDay(relief({ relieved_at: "08:10" }), { now: T("08:15") });
+  assert.equal(at(late, "breakfast").at, "08:45");                // home at 08:40, no second sleep
+  assert.equal(at(late, "relief").end, T("08:10"));
+});

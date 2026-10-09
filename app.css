@@ -376,3 +376,6 @@ button.tl-row:active { background: var(--card-2); }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .chipbtn { min-height: 36px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: inherit; font: inherit; font-size: .85rem; }
 .chipbtn.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.workrow { padding: 6px 0; border-top: 1px solid var(--line); }
+.workrow:first-of-type { border-top: 0; }
+.workrow p { margin: 0 0 6px; }

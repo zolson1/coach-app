@@ -197,6 +197,23 @@ export function applyOps(f, ops, ctx = {}) {
         else d.mat_log[o.slot] = { status: o.status, ...(o.class ? { class: o.class } : {}), ...(o.note ? { note: o.note } : {}) };
         break;
       }
+      case "work_set": {              // where he's working, report, expected / actual relief
+        for (const d of f.days) {
+          for (const k of ["today", "relief", "tomorrow"]) {
+            const b = d.work?.[k];
+            if (!b || b.date !== o.date) continue;
+            const set = o.clear ? {} : { ...(b.set || {}) };
+            if (!o.clear) {
+              for (const key of ["where", "report", "relief", "relieved_at"]) {
+                if (!(key in o)) continue;
+                if (o[key] == null || o[key] === "") delete set[key]; else set[key] = o[key];
+              }
+            }
+            d.work = { ...d.work, [k]: { ...b, set, ...(set.where ? { where: set.where } : {}) } };
+          }
+        }
+        break;
+      }
       case "session_log": {           // training timing on the day's timeline
         const d = day(date);
         if (!d) break;

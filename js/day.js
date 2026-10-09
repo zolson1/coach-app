@@ -32,7 +32,7 @@ function tlRow(d, i) {
   const time = `${esc(i.at)}${i.until && ["train", "work"].includes(i.kind) ? `<span class="muted">–${esc(i.until)}</span>` : ""}`;
   const r = i.slot ? rowFor(d, i.slot) : null;
   const notes = [
-    i.at_work ? i.work_note : null,
+    i.at_work ? i.work_note : i.where === "station" && EAT.has(i.kind) && !i.status ? "At work — pack it." : null,
     i.why && (i.moved || ["squeezed", "fold"].includes(i.status) || i.tight || i.kind === "work") ? i.why : null,
     i.late && !i.at_work && !i.status ? `If relief runs late: ${i.late.replace(/^Still at the station: /, "")}` : null,
     ...(i.adjust || []), ...(i.notes || []),

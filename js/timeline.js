@@ -159,11 +159,12 @@ function applyWork(items, day, tl, R) {
       if (EATING.has(it.kind) && it.slot && it.kind !== "during") {
         it.at_work = true;
         it.work_note = it.late || station[it.slot] || R.station_snack || "Still at the station: the Core Power from your kit.";
-      } else if (it.kind === "train" && it.train !== "mat") {
+      } else if (it.kind === "train" && !["mat", "activity"].includes(it.train)) {
         it.after_work = b.eff + 30;
       } else if (it.kind === "train") {
         it.at_work = true;
-        it.work_note = "Relieved late — this class is out; the mat card has the swaps.";
+        it.work_note = it.train === "mat" ? "Relieved late — this class is out; the mat card has the swaps."
+          : `Relieved late — move ${it.label.replace(/ \(.*$/, "")} or let it go.`;
       }
     }
   }
@@ -375,7 +376,7 @@ function rebalance(items, tl, ctx) {
       out.lines = [`About ${Math.round(over)} kcal over the card — nothing to trim away from training today. One day doesn't move the plan; back on the card at the next meal.`];
     }
   } else {
-    const ahead = trains.filter((s) => s.train === "lift" || s.train === "mat" || s.train === "lic");
+    const ahead = trains.filter((s) => ["lift", "mat", "lic", "activity"].includes(s.train));
     const short = target.carbs - projected.carbs;
     if (ahead.length && (short >= 40 || over <= -250)) {
       const s = ahead[0];

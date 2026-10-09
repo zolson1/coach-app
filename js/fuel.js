@@ -33,7 +33,7 @@ function dayHTML(f, d) {
   const t = dayTotals(d);
   const live = d.when !== "future";
   const sessions = [d.mat === "double" ? "BJJ + Muay Thai" : d.mat === "one" ? "One class" : null,
-    ...(d.sessions || []).map((s) => SESSION_NAME[s] || s)].filter(Boolean);
+    ...(d.sessions || []).map((s) => SESSION_NAME[s] || s), ...(d.activities || []).map((a) => a.name)].filter(Boolean);
   let html = `<section class="card dayhead">
     <div class="lift-head"><h2>${esc(dayLabel(d.date))}</h2>${levelChip(lv.today, LEVEL_NAME[lv.today])}</div>
     <p class="big-num">${fmtNum(lv.kcal)} <span>kcal</span> · ${lv.protein}+ <span>g protein</span> · ${esc(String(lv.carbs).replace("~", ""))} <span>carbs</span></p>
@@ -42,7 +42,9 @@ function dayHTML(f, d) {
     ${lv.pending ? `<p class="adj">Changing to ${esc(lv.pending)} — the card updates in about a minute.</p>` : ""}
     ${d.leave ? `<p class="adj">Leave: ${esc({ full: "the whole shift", first12: "first 12 h — working the night half", last12: "last 12 h — working the day half" }[d.leave.part])}</p>` : ""}
     ${d.leave_pending ? `<p class="muted small">Leave saved — the plan rebuilds in about a minute.</p>` : ""}
-    ${["SHIFT", "OT-DAY", "OT-NIGHT"].includes(d.leave?.base || d.day_type) && d.when !== "past" ? `<div class="toolrow"><button class="btn sm ghost" data-a="leavesheet" data-date="${d.date}">Leave…</button></div>` : ""}
+    ${d.plan_pending ? `<p class="muted small">Plan change saved — this day rebuilds in about a minute.</p>` : ""}
+    ${d.when !== "past" ? `<div class="toolrow"><button class="btn sm ghost" data-a="plansheet" data-date="${d.date}">Edit training…</button>
+      ${["SHIFT", "OT-DAY", "OT-NIGHT"].includes(d.leave?.base || d.day_type) ? `<button class="btn sm ghost" data-a="leavesheet" data-date="${d.date}">Leave…</button>` : ""}</div>` : ""}
     ${d.sleep_gated && d.when === "future" ? `<p class="muted small">Sleep-gated: 3–6 h on shift drops this a level; under 3 h makes it F1.</p>` : ""}
     ${live ? `<div class="meter" title="protein"><i style="width:${Math.min(100, (t.protein / (f.protein_floor || 200)) * 100)}%"></i></div>
       <p class="muted small">Logged ${t.logged} of ${t.rows} · ${fmtNum(t.kcal)} of ${fmtNum(t.plan_kcal)} kcal · ${t.protein} g protein (floor ${f.protein_floor})</p>` : ""}

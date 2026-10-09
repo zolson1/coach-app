@@ -11,7 +11,7 @@ import { liveDay, hm, toMin, workBlock, earlyLights } from "./timeline.js";
 
 export const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
 const EAT = new Set(["meal", "snack", "during", "extra"]);
-const TRAIN_ICON = { mat: "🥋", lift: "🏋", lic: "🚴", mobility: "🧘" };
+const TRAIN_ICON = { mat: "🥋", lift: "🏋", lic: "🚴", mobility: "🧘", activity: "🏃" };
 const ICON = { meal: "🍽", snack: "🥤", during: "💧", work: "🚒", sleep: "☾", cue: "·", extra: "➕" };
 
 export function live(d) {
@@ -42,6 +42,7 @@ function tlRow(d, i) {
   const macro = eating && i.eff && (i.eff.kcal || i.eff.protein) ? `${fmtNum(Math.round(i.eff.kcal))} kcal · ${Math.round(i.eff.protein)} g P` : "";
   const label = i.kind === "train" || i.kind === "sleep" || i.kind === "work" ? i.label : (i.label || i.what);
   const act = eating && i.slot && d.card?.rows.some((x) => x.slot === i.slot) ? `data-a="rowsheet" data-date="${d.date}" data-slot="${esc(i.slot)}"`
+    : i.activity ? `data-a="actsheet" data-date="${d.date}" data-id="${esc(i.activity)}"`
     : i.kind === "train" && i.train === "mat" ? `data-a="classsheet" data-date="${d.date}" data-slot="${esc(i.session.replace(/^mat_/, ""))}"`
     : i.kind === "train" ? `data-a="sesssheet" data-date="${d.date}" data-id="${esc(i.id)}"`
     : i.kind === "work" && i.block ? `data-a="worksheet" data-block="${esc(i.block)}" data-day="${d.date}"` : "";
@@ -63,7 +64,7 @@ export function timelineCard(d, { title = "Your day", open = true } = {}) {
     head = `<p class="adj">So far ≈${fmtNum(Math.round(b.eaten.kcal))} kcal · ${Math.round(b.eaten.protein)} g protein (${signed(b.dev.kcal)} kcal vs the card). `
       + (b.adjustments.length ? "The rest of today is adjusted below." : esc(b.lines?.[0] || "Nothing to change — back on the card at the next meal.")) + `</p>`;
   }
-  const rows = L.items.filter((i) => i.kind !== "cue" || i.slot === "overnight").map((i) => tlRow(d, i)).join("");
+  const rows = L.items.filter((i) => i.kind !== "cue" || i.slot === "overnight" || i.activity).map((i) => tlRow(d, i)).join("");
   const extras = L.untimed.filter((i) => i.extra).map((i) => `<p class="muted small">➕ ${esc(i.label)} — ${fmtNum(i.eff.kcal)} kcal (no time logged)</p>`).join("");
   const body = `${head}<div class="tl">${rows}</div>${extras}
     ${(d.timeline.notes || []).map((n) => `<p class="muted small">${esc(n)}</p>`).join("")}
@@ -281,7 +282,11 @@ Object.assign(A, {
     send({ op: "work_set", date: sh.block, clear: true });
   },
   relievednow(d) { send({ op: "work_set", date: d.block, relieved_at: hm(nowMin()) }); },
-  sesssheet(d) { sheet({ type: "sess", date: d.date, id: d.id }); },
+  sesssheet(d) {
+    const i = live(dayOf(d.date))?.items.find((x) => x.id === d.id);
+    if (i?.activity) { sheet({ type: "act", date: d.date, id: i.activity }); return; }
+    sheet({ type: "sess", date: d.date, id: d.id });
+  },
   sessmark(d) {
     const sh = S.sheet;
     const day = dayOf(sh.date);

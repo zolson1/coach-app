@@ -7,6 +7,7 @@ import { sessionButton } from "./train.js";
 import { matCard, mobilityCard } from "./mat.js";
 import { fixPending } from "./fix.js";
 import { timelineCard, nextOf, workCard } from "./day.js";
+import { suggestionsCard } from "./plan.js";
 
 export function viewToday() {
   const p = S.plan;
@@ -30,6 +31,7 @@ export function viewToday() {
       <p class="muted small">${tot.logged} of ${tot.rows} meals logged · ${tot.protein} of ${f.protein_floor} g protein</p></section>`;
 
     html += workCard(d);
+    html += suggestionsCard();
     const now = new Date();
     const dinner = d.card.rows.find((r) => r.slot === "dinner" && r.company && !d.log?.[r.slot]);
     const nx = nextOf(d);
@@ -43,7 +45,8 @@ export function viewToday() {
         html += `<section class="card next"><span class="eyebrow">Next · ${esc(i.at)}${i.until ? `–${esc(i.until)}` : ""}</span>
           <h2>${esc(i.label)}</h2>${notes.map((n) => `<p class="adj">${esc(n)}</p>`).join("")}
           <div class="two">${spec ? `<button class="btn primary" data-a="open" data-k="${esc(i.session)}">Start</button>` : ""}
-            ${i.train === "mat" ? `<button class="btn" data-a="classsheet" data-date="${d.date}" data-slot="${esc(i.session.replace(/^mat_/, ""))}">Class done / swapped…</button>`
+            ${i.train === "activity" ? `<button class="btn" data-a="actsheet" data-date="${d.date}" data-id="${esc(i.activity)}">Done / moved / skipped…</button>`
+              : i.train === "mat" ? `<button class="btn" data-a="classsheet" data-date="${d.date}" data-slot="${esc(i.session.replace(/^mat_/, ""))}">Class done / swapped…</button>`
               : `<button class="btn" data-a="sesssheet" data-date="${d.date}" data-id="${esc(i.id)}">Done / moved / skipped…</button>`}</div>
           ${dinner ? companyControl(d, dinner, dinnerAt) + companyDetail(dinner) : ""}</section>`;
       } else {
@@ -73,11 +76,14 @@ export function viewToday() {
   const sessions = p?.sessions || {};
   const runnable = (t?.sessions || []).filter((k) => sessions[k]);
   html += matCard(d);
-  html += `<section class="card"><h2>Training</h2>
+  html += `<section class="card"><div class="lift-head"><h2>Training</h2><button class="btn sm ghost" data-a="plansheet" data-date="${today()}">Edit today</button></div>
+    ${(d?.activities || []).map((a) => `<button class="notice" data-a="actsheet" data-date="${today()}" data-id="${esc(a.id)}"><b>${esc(a.name)}</b> · ${esc(a.start || "set a time")}${a.dur ? `, ${a.dur} min` : ""} <span class="muted">· ${esc(a.intensity === "hard" ? "a hard session" : "counts as Zone 2")}</span></button>`).join("")}
+    ${d?.covered ? `<p class="line">Zone 2 — covered by ${esc(d.covered.lic)}; no separate LIC.</p>` : ""}
+    ${d?.plan_pending ? `<p class="muted small">Plan change saved — today rebuilds in about a minute.</p>` : ""}
     ${S.active ? `<button class="btn primary big" data-a="resume">Resume ${esc(S.active.spec.title)}</button>` : ""}
     ${runnable.map((k) => sessionButton(sessions[k], true)).join("")}
-    ${(t?.sessions || []).includes("lic") ? `<p class="line">Zone 2, 45–60 min.</p>` : ""}
-    ${!d?.mat_plan && !runnable.length && !(t?.sessions || []).includes("lic") ? `<p class="muted">Nothing scheduled${t ? "" : " — today's plan arrives with the morning run"}.</p>` : ""}
+    ${(d?.sessions || t?.sessions || []).includes("lic") ? `<p class="line">Zone 2, 45–60 min.</p>` : ""}
+    ${!d?.mat_plan && !runnable.length && !(d?.sessions || t?.sessions || []).includes("lic") && !(d?.activities || []).length ? `<p class="muted">Nothing scheduled${t ? "" : " — today's plan arrives with the morning run"}.</p>` : ""}
     ${t?.deviation ? `<p class="warn-text">${esc(t.deviation)}</p>` : ""}</section>`;
   html += mobilityCard();
 

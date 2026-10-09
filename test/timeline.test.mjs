@@ -173,3 +173,16 @@ test("the relief morning: an 03:30 relief sleeps again, a late one eats when hom
   assert.equal(at(late, "breakfast").at, "08:45");                // home at 08:40, no second sleep
   assert.equal(at(late, "relief").end, T("08:10"));
 });
+
+test("an activity is a fixed block: the lift works around it, a late relief flags it", () => {
+  const d = day();
+  d.timeline.items.splice(2, 0, { id: "act_tennis", kind: "train", train: "activity", session: "act_tennis", activity: "tennis",
+    t: T("14:00"), end: T("15:30"), fixed: true, label: "Tennis (moderate — counts as Zone 2)" });
+  const live = liveDay(d, { now: T("13:00") });
+  assert.equal(at(live, "act_tennis").at, "14:00");
+  assert.ok(at(live, "strength_a").t >= T("15:45"));
+  const moved = liveDay({ ...d, session_log: { act_tennis: { status: "moved", at: "09:00" } } }, { now: T("08:00") });
+  assert.equal(at(moved, "act_tennis").at, "09:00");
+  const skipped = liveDay({ ...d, session_log: { act_tennis: { status: "skipped" } } }, { now: T("13:00") });
+  assert.equal(at(skipped, "act_tennis").status, "skipped");
+});

@@ -142,3 +142,24 @@ test("a cook day packed for two adds singles and for-two packs", () => {
   applyOps(f, [{ op: "cooked", cook_day: 1, with_alternates: false, packs: { chili: { single: 4, duo: 5 } } }]);
   assert.deepEqual([f.kitchen.counts.chili, f.kitchen.counts.chili_duo, f.kitchen.counts.chicken_bowls], [11, 5, 19]);
 });
+
+test("plan edits: skip, move (both days), restore brings it home; an activity shows at once", () => {
+  const f = fuel();
+  f.days[0].sessions = ["lic"];
+  f.days[1].sessions = ["domain", "lic"];
+  applyOps(f, [{ op: "plan_edit", date: "2026-10-01", action: "move", session: "domain", to: "2026-09-30" },
+    { op: "plan_edit", date: "2026-09-30", action: "remove", session: "lic" }]);
+  assert.deepEqual(f.days[0].sessions, ["domain"]);
+  assert.deepEqual(f.days[1].sessions, ["lic"]);
+  assert.equal(f.days[0].edits.add[0].from, "2026-10-01");
+  assert.ok(f.days[0].plan_pending && f.days[1].plan_pending);
+  applyOps(f, [{ op: "plan_edit", date: "2026-10-01", action: "restore", session: "domain" }]);
+  assert.deepEqual(f.days[0].sessions, []);
+  assert.deepEqual(f.days[1].sessions, ["lic", "domain"]);
+  applyOps(f, [{ op: "activity", date: "2026-10-01", id: "tennis", name: "Tennis", start: "10:00", dur: 90 },
+    { op: "plan_edit", date: "2026-10-01", action: "mat", mat: "one" }]);
+  assert.deepEqual(f.days[1].activities, [{ id: "tennis", name: "Tennis", intensity: "moderate", start: "10:00", dur: 90 }]);
+  assert.equal(f.days[1].mat, "one");
+  applyOps(f, [{ op: "activity", date: "2026-10-01", id: "tennis", remove: true }]);
+  assert.deepEqual(f.days[1].activities, []);
+});

@@ -234,6 +234,46 @@ export function applyOps(f, ops, ctx = {}) {
         }
         break;
       }
+      case "plan_edit": {             // the session list moves now; the timeline and meals follow on the rebuild
+        const d = day(o.date);
+        if (!d) break;
+        const k = o.session;
+        const ed = d.edits = { ...(d.edits || {}) };
+        const drop = (x, key) => { x.sessions = (x.sessions || []).filter((s) => s !== key); };
+        d.plan_pending = true;
+        if (o.action === "remove") { drop(d, k); ed.remove = [...new Set([...(ed.remove || []), k])]; }
+        else if (o.action === "add" && k && !(d.sessions || []).includes(k)) d.sessions = [...(d.sessions || []), k];
+        else if (o.action === "mat") d.mat = o.mat === "one" || o.mat === "double" ? o.mat : null;
+        else if (o.action === "restore") {
+          const to = ed.moved?.[k];
+          if (to && day(to)) { drop(day(to), k); day(to).plan_pending = true; }
+          if (!(d.sessions || []).includes(k)) d.sessions = [...(d.sessions || []), k];
+          ed.remove = (ed.remove || []).filter((s) => s !== k);
+          if (ed.moved) { ed.moved = { ...ed.moved }; delete ed.moved[k]; }
+        } else if (o.action === "move" && o.to) {
+          drop(d, k);
+          const from = (ed.add || []).find((x) => x.from && (x.kind === "strength" ? `strength_${String(x.which).toLowerCase()}` : x.kind) === k)?.from || o.date;
+          ed.remove = [...new Set([...(ed.remove || []), k])];
+          ed.moved = { ...(ed.moved || {}), [k]: o.to };
+          const t = day(o.to);
+          if (t && !(t.sessions || []).includes(k)) {
+            t.sessions = [...(t.sessions || []), k];
+            t.edits = { ...(t.edits || {}), add: [...(t.edits?.add || []), { kind: k.startsWith("strength_") ? "strength" : k, ...(k.startsWith("strength_") ? { which: k.slice(-1).toUpperCase() } : {}), from }] };
+            t.plan_pending = true;
+          }
+        }
+        break;
+      }
+      case "activity": {              // an activity shows on the day at once; it covers the Zone 2 on the rebuild
+        const d = day(o.date);
+        if (!d) break;
+        const acts = (d.activities || []).filter((a) => a.id !== o.id);
+        if (!o.remove) acts.push({ id: o.id, name: o.name || "Activity", intensity: o.intensity || "moderate",
+          ...(o.start ? { start: o.start } : {}), ...(o.dur ? { dur: o.dur } : {}) });
+        d.activities = acts;
+        d.plan_pending = true;
+        break;
+      }
       case "session_log": {           // training timing on the day's timeline
         const d = day(date);
         if (!d) break;

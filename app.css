@@ -379,3 +379,4 @@ button.tl-row:active { background: var(--card-2); }
 .workrow { padding: 6px 0; border-top: 1px solid var(--line); }
 .workrow:first-of-type { border-top: 0; }
 .workrow p { margin: 0 0 6px; }
+.option.on { border-color: var(--accent); outline: 2px solid var(--accent); }

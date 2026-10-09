@@ -80,6 +80,9 @@ export function nextOf(d) {
 
 // ------------------------------------------------------------ work: report and relief
 const WHERE_TXT = { home: "Home station", detail: "Detail" };
+const TYPE_TXT = (b) => b.leave === "first12" ? "night half (first 12 h on leave)" : b.leave === "last12" ? "day half (last 12 h on leave)"
+  : b.type === "SHIFT" ? "24" : b.type === "OT-DAY" ? "OT day" : "OT night";
+const LEAVE_TXT = { full: "the whole shift", first12: "the first 12 h", last12: "the last 12 h" };
 const hmDay = (m) => `${hm(m)}${m >= 1440 ? " (next day)" : m < 0 ? " (day before)" : ""}`;
 
 function blockOf(d, date) {
@@ -100,18 +103,25 @@ export function workCard(d) {
     if (!b) continue;
     const done = b.actual != null;
     const endsToday = b.relief < 1440;
-    rows.push(`<div class="workrow"><p><b>${esc(WHERE_TXT[b.where])}</b> · ${esc(b.type === "SHIFT" ? "24" : b.type === "OT-DAY" ? "OT day" : "OT night")}
+    rows.push(`<div class="workrow"><p><b>${esc(WHERE_TXT[b.where])}</b> · ${esc(TYPE_TXT(b))}
       — ${b.report >= 0 ? `report ${esc(hm(b.report))} · ` : ""}${done ? `relieved ${esc(hm(b.actual))}` : `relief ≈${esc(hmDay(b.relief))}`}
       ${!done && endsToday ? `<span class="muted"> · late: ${esc(hm(b.late))}+</span>` : ""}</p>
       <div class="toolrow">${endsToday && !done && now >= b.report ? `<button class="btn sm primary" data-a="relievednow" data-block="${esc(b.date)}">Relieved now</button>
         <button class="btn sm" data-a="worksheet" data-block="${esc(b.date)}" data-day="${d.date}" data-late="1">Running late…</button>` : ""}
-        <button class="btn sm ghost" data-a="worksheet" data-block="${esc(b.date)}" data-day="${d.date}">Edit</button></div></div>`);
+        <button class="btn sm ghost" data-a="worksheet" data-block="${esc(b.date)}" data-day="${d.date}">Edit</button>
+        ${b === today ? `<button class="btn sm ghost" data-a="leavesheet" data-date="${esc(b.date)}">Leave…</button>` : ""}</div></div>`);
   }
   if (tom && ["SHIFT", "OT-DAY"].includes(tom.type) && !(today && ["SHIFT", "OT-NIGHT"].includes(today.type))) {
     rows.push(`<div class="workrow"><p><b>Tomorrow</b> · ${esc(WHERE_TXT[tom.where])} — report ${esc(hm(tom.report))}
       <span class="muted">· lights out tonight ≈${esc(hm(earlyLights(tom.report - 1440)))}</span></p>
-      <div class="toolrow"><button class="btn sm ghost" data-a="worksheet" data-block="${esc(tom.date)}" data-day="${d.date}">${tom.where === "home" ? "On a detail?" : "Edit"}</button></div></div>`);
+      <div class="toolrow"><button class="btn sm ghost" data-a="worksheet" data-block="${esc(tom.date)}" data-day="${d.date}">${tom.where === "home" ? "On a detail?" : "Edit"}</button>
+        <button class="btn sm ghost" data-a="leavesheet" data-date="${esc(tom.date)}">Leave…</button></div></div>`);
   }
+  if (d.leave?.part === "full") {
+    rows.unshift(`<div class="workrow"><p><b>On leave</b> — ${esc(LEAVE_TXT.full)} (it was a ${esc(d.leave.base === "SHIFT" ? "24" : d.leave.base)})</p>
+      <div class="toolrow"><button class="btn sm ghost" data-a="leavesheet" data-date="${d.date}">Change</button></div></div>`);
+  }
+  if (d.leave_pending) rows.push(`<p class="muted small">Leave saved — the plan rebuilds in about a minute.</p>`);
   return rows.length ? `<section class="card"><h2>Work</h2>${rows.join("")}</section>` : "";
 }
 
@@ -133,6 +143,27 @@ SHEETS.work = (sh) => {
     <label class="fld">Actually relieved at${endsNextDay ? " (next day)" : ""}<input type="time" id="wkactual" value="${esc(set.relieved_at || "")}"></label>
     <div class="sheet-foot"><button class="btn ghost" data-a="workclear">Back to the defaults</button>
       <button class="btn primary" data-a="worksave">Save</button></div>
+    <button class="btn ghost" data-a="closesheet">Close</button></div>`;
+};
+
+// ------------------------------------------------------------ leave
+// For the days the calendar doesn't know about: the whole shift off, or one half of a 24.
+SHEETS.leave = (sh) => {
+  const d = dayOf(sh.date);
+  if (!d) return "";
+  const base = d.leave?.base || d.day_type;
+  const work = ["SHIFT", "OT-DAY", "OT-NIGHT"].includes(base);
+  const cur = d.leave?.part;
+  const opt = (part, title, sub) => `<button class="option ${cur === part ? "on" : ""}" data-a="leaveset" data-part="${part}">
+    <b>${title}</b><span class="muted">${sub}</span></button>`;
+  return `<div class="sheet"><h3>Leave — ${esc(dayLabel(sh.date))}</h3>
+    ${!work ? `<p class="muted">That's not a work day on the schedule, so there's nothing to take off. If the schedule's wrong, use Fix → "Today is actually".</p>` : `
+    <p class="muted small">For leave the calendar didn't pick up. The plan rebuilds for it in about a minute — training, meals, tonight's lights out.</p>
+    ${opt("full", "Whole shift off", "The day plans as a day off.")}
+    ${base === "SHIFT" ? opt("first12", "First 12 h off", "You work the night half: report 15:30 (17:30 on a detail), relief next morning.") +
+      opt("last12", "Last 12 h off", "You work the day half: report 03:30 (05:30), relieved ≈15:30 (17:30).") : ""}
+    <label class="fld">Note (optional)<input id="lvnote" placeholder="e.g. annual leave, swap with Smith"></label>`}
+    ${cur ? `<button class="btn ghost" data-a="leaveset" data-part="clear">No leave — back to the schedule</button>` : ""}
     <button class="btn ghost" data-a="closesheet">Close</button></div>`;
 };
 
@@ -217,6 +248,13 @@ Object.assign(INPUTS, {
 });
 
 Object.assign(A, {
+  leavesheet(d) { sheet({ type: "leave", date: d.date }); },
+  leaveset(d) {
+    const sh = S.sheet;
+    const note = document.getElementById("lvnote")?.value?.trim();
+    sheet(null);
+    send({ op: "leave", date: sh.date, part: d.part, ...(note ? { note } : {}) });
+  },
   worksheet(d) { sheet({ type: "work", block: d.block, day: d.day || today(), late: !!d.late }); },
   workwhere(d) {
     const sh = S.sheet;

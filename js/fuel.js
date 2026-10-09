@@ -40,6 +40,9 @@ function dayHTML(f, d) {
     <p class="muted">${esc(statusLine(d))}${sessions.length ? ` — ${esc(sessions.join(" · "))}` : ""}</p>
     ${(lv.why || []).map((w) => `<p class="adj">${esc(w)}</p>`).join("")}
     ${lv.pending ? `<p class="adj">Changing to ${esc(lv.pending)} — the card updates in about a minute.</p>` : ""}
+    ${d.leave ? `<p class="adj">Leave: ${esc({ full: "the whole shift", first12: "first 12 h — working the night half", last12: "last 12 h — working the day half" }[d.leave.part])}</p>` : ""}
+    ${d.leave_pending ? `<p class="muted small">Leave saved — the plan rebuilds in about a minute.</p>` : ""}
+    ${["SHIFT", "OT-DAY", "OT-NIGHT"].includes(d.leave?.base || d.day_type) && d.when !== "past" ? `<div class="toolrow"><button class="btn sm ghost" data-a="leavesheet" data-date="${d.date}">Leave…</button></div>` : ""}
     ${d.sleep_gated && d.when === "future" ? `<p class="muted small">Sleep-gated: 3–6 h on shift drops this a level; under 3 h makes it F1.</p>` : ""}
     ${live ? `<div class="meter" title="protein"><i style="width:${Math.min(100, (t.protein / (f.protein_floor || 200)) * 100)}%"></i></div>
       <p class="muted small">Logged ${t.logged} of ${t.rows} · ${fmtNum(t.kcal)} of ${fmtNum(t.plan_kcal)} kcal · ${t.protein} g protein (floor ${f.protein_floor})</p>` : ""}

@@ -197,6 +197,11 @@ export function applyOps(f, ops, ctx = {}) {
         else d.mat_log[o.slot] = { status: o.status, ...(o.class ? { class: o.class } : {}), ...(o.note ? { note: o.note } : {}) };
         break;
       }
+      case "leave": {                 // the day re-plans on the coach's side; show it's coming
+        const d = day(o.date);
+        if (d) d.leave_pending = o.part;
+        break;
+      }
       case "work_set": {              // where he's working, report, expected / actual relief
         for (const d of f.days) {
           for (const k of ["today", "relief", "tomorrow"]) {

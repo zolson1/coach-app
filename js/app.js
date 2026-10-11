@@ -10,6 +10,7 @@ import { viewToday } from "./today.js";
 import { wireCharts } from "./charts.js";
 import "./ui.js";
 import { viewMat } from "./mat.js";
+import { viewWeek } from "./week.js";
 import "./fix.js";
 import "./ask.js";
 import "./day.js";
@@ -17,7 +18,7 @@ import "./plan.js";
 
 const TABS = [["today", "Today", "☀"], ["train", "Train", "🏋"], ["fuel", "Fuel", "🍽"], ["kitchen", "Kitchen", "🧊"], ["progress", "Progress", "📈"]];
 const TAB_VIEW = { today: viewToday, train: viewTrain, fuel: viewFuel, kitchen: viewKitchen, progress: viewProgress };
-const OVER = { session: viewSession, finish: viewFinish, settings: viewSettings, cook: viewCook, recipe: viewRecipe, cycle: viewCycle, draft: viewDraft, mat: viewMat };
+const OVER = { session: viewSession, finish: viewFinish, settings: viewSettings, cook: viewCook, recipe: viewRecipe, cycle: viewCycle, draft: viewDraft, mat: viewMat, week: viewWeek };
 Object.assign(INPUTS, kitchenInputs);
 
 function banners() {

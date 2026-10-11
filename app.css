@@ -382,3 +382,5 @@ button.tl-row:active { background: var(--card-2); }
 .option.on { border-color: var(--accent); outline: 2px solid var(--accent); }
 .row-btn { width: 100%; text-align: left; border: 0; background: transparent; color: inherit; font: inherit; }
 .countgrid { display: grid; gap: 8px; max-height: 55vh; overflow-y: auto; margin-bottom: 8px; }
+.wk-row { margin: 2px 0; }
+.wk .badge { font-style: normal; }

@@ -38,9 +38,12 @@ export function suggestionsCard() {
   if (!list.length) return "";
   return `<section class="card"><h2>Looking ahead</h2>
     ${list.map((s) => `<div class="workrow"><p><b>${esc(s.title)}</b></p><p class="muted small">${esc(s.text)}</p>
-      <div class="toolrow"><button class="btn sm primary" data-a="sugdo" data-id="${esc(s.id)}">Do it</button>
+      ${s.ops?.length ? `<div class="toolrow"><button class="btn sm primary" data-a="sugdo" data-id="${esc(s.id)}">Do it</button>
         <button class="btn sm ghost" data-a="plansheet" data-date="${esc(s.dates[0])}">Edit ${esc(short(s.dates[0]).replace(/^To(day|morrow)$/, (m) => m.toLowerCase()))}…</button>
-        <button class="btn sm ghost" data-a="sugno" data-id="${esc(s.id)}">Not this time</button></div></div>`).join("")}
+        <button class="btn sm ghost" data-a="sugno" data-id="${esc(s.id)}">Not this time</button></div>`
+      : `<div class="toolrow"><button class="btn sm" data-a="matpicksheet" data-date="${esc(s.dates[0])}">Classes…</button>
+        <button class="btn sm ghost" data-a="weekview">The week</button>
+        <button class="btn sm ghost" data-a="sugno" data-id="${esc(s.id)}">Got it</button></div>`}</div>`).join("")}
   </section>`;
 }
 
@@ -81,8 +84,8 @@ SHEETS.plan = (sh) => {
       <div class="toolrow"><button class="btn sm ghost" data-a="planedit" data-act="restore" data-k="${esc(k)}">Bring it back</button></div></div>`).join("")}
     ${(d.activities || []).map((a) => `<div class="workrow"><p><b>${esc(a.name)}</b> <span class="muted">· ${esc(a.start || "no time yet")}${a.dur ? `, ${a.dur} min` : ""} · ${esc(a.intensity)}</span></p>
       <div class="toolrow"><button class="btn sm ghost" data-a="actsheet" data-date="${d.date}" data-id="${esc(a.id)}">Edit</button></div></div>`).join("")}
-    <p class="small"><b>Class</b></p>
-    <div class="segs">${Object.entries(MAT).map(([k, v]) => `<button class="seg ${(d.mat || "none") === k ? "on" : ""}" data-a="planmat" data-mat="${k}">${v}</button>`).join("")}</div>
+    <div class="workrow"><p><b>Classes</b> <span class="muted">— ${d.mat_plan?.slots?.length ? esc(d.mat_plan.slots.map((s) => `${s.class.start} ${s.class.name}`).join(" → ")) : "none"}${d.mat_plan?.chosen_by === "you" ? " (your pick)" : ""}</span></p>
+      <div class="toolrow"><button class="btn sm" data-a="matpicksheet" data-date="${d.date}">Change classes…</button></div></div>
     <div class="toolrow"><button class="btn sm" data-a="actsheet" data-date="${d.date}">+ Activity</button>
       <button class="btn sm ${sh.adding ? "primary" : ""}" data-a="planaddpick">+ Session</button></div>
     ${sh.adding ? `<div class="chips">${ADDABLE.filter((k) => !have.has(k)).map((k) => `<button class="chipbtn" data-a="planedit" data-act="add" data-k="${k}">${esc(SESSION_NAME[k])}</button>`).join("")}</div>` : ""}

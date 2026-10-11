@@ -76,7 +76,7 @@ export function viewToday() {
   const sessions = p?.sessions || {};
   const runnable = (t?.sessions || []).filter((k) => sessions[k]);
   html += matCard(d);
-  html += `<section class="card"><div class="lift-head"><h2>Training</h2><button class="btn sm ghost" data-a="plansheet" data-date="${today()}">Edit today</button></div>
+  html += `<section class="card"><div class="lift-head"><h2>Training</h2><div class="btnpair"><button class="btn sm" data-a="weekview">Week</button><button class="btn sm ghost" data-a="plansheet" data-date="${today()}">Edit today</button></div></div>
     ${(d?.activities || []).map((a) => `<button class="notice" data-a="actsheet" data-date="${today()}" data-id="${esc(a.id)}"><b>${esc(a.name)}</b> · ${esc(a.start || "set a time")}${a.dur ? `, ${a.dur} min` : ""} <span class="muted">· ${esc(a.intensity === "hard" ? "a hard session" : "counts as Zone 2")}</span></button>`).join("")}
     ${d?.covered ? `<p class="line">Zone 2 — covered by ${esc(d.covered.lic)}; no separate LIC.</p>` : ""}
     ${d?.plan_pending ? `<p class="muted small">Plan change saved — today rebuilds in about a minute.</p>` : ""}

@@ -32,9 +32,9 @@ function tlRow(d, i) {
   const time = `${esc(i.at)}${i.until && ["train", "work"].includes(i.kind) ? `<span class="muted">–${esc(i.until)}</span>` : ""}`;
   const r = i.slot ? rowFor(d, i.slot) : null;
   const notes = [
-    i.at_work ? i.work_note : i.where === "station" && EAT.has(i.kind) && !i.status ? "At work — pack it." : null,
+    i.at_work ? i.work_note : i.where === "station" && EAT.has(i.kind) && !i.status ? (i.station_food ? "At the station." : "At work — pack it.") : null,
     i.why && (i.moved || ["squeezed", "fold"].includes(i.status) || i.tight || i.kind === "work") ? i.why : null,
-    i.late && !i.at_work && !i.status ? `If relief runs late: ${i.late.replace(/^Still at the station: /, "")}` : null,
+    typeof i.late === "string" && !i.at_work && !i.status ? `If relief runs late: ${i.late.replace(/^Still at the station: /, "")}` : null,
     ...(i.adjust || []), ...(i.notes || []),
     r?.company === "shared" && r.for_two ? r.for_two : null,
     r?.company === "away" && r.away_note ? r.away_note : null,
@@ -107,7 +107,7 @@ export function workCard(d) {
     rows.push(`<div class="workrow"><p><b>${esc(WHERE_TXT[b.where])}</b> · ${esc(TYPE_TXT(b))}
       — ${b.report >= 0 ? `report ${esc(hm(b.report))} · ` : ""}${done ? `relieved ${esc(hm(b.actual))}` : `relief ≈${esc(hmDay(b.relief))}`}
       ${!done && endsToday ? `<span class="muted"> · late: ${esc(hm(b.late))}+</span>` : ""}</p>
-      <div class="toolrow">${endsToday && !done && now >= b.report ? `<button class="btn sm primary" data-a="relievednow" data-block="${esc(b.date)}">Relieved now</button>
+      <div class="toolrow">${endsToday && !done && now >= b.report && now < b.late + 120 ? `<button class="btn sm primary" data-a="relievednow" data-block="${esc(b.date)}">Relieved now</button>
         <button class="btn sm" data-a="worksheet" data-block="${esc(b.date)}" data-day="${d.date}" data-late="1">Running late…</button>` : ""}
         <button class="btn sm ghost" data-a="worksheet" data-block="${esc(b.date)}" data-day="${d.date}">Edit</button>
         ${b === today ? `<button class="btn sm ghost" data-a="leavesheet" data-date="${esc(b.date)}">Leave…</button>` : ""}</div></div>`);

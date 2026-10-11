@@ -9,7 +9,8 @@ const ICON = { done: "✓", drilled: "◐", swapped: "⇄", skipped: "✕" };
 const DISC = { bjj_gi: "BJJ (gi)", bjj_nogi: "BJJ (no-gi)", muay_thai: "Muay Thai", open_mat: "Open mat", mma: "MMA", grappling_live: "Live grappling" };
 const back = () => `<button class="icon" data-a="closeview" aria-label="Back">‹</button>`;
 const weekdayIdx = (iso) => (new Date(iso + "T12:00:00").getDay() + 6) % 7;      // Monday = 0, like the timetable
-const optionsFor = (iso) => S.plan?.timetable?.[String(weekdayIdx(iso))] || [];
+// that date's classes: the live schedule the coach planned from, else the gym's usual week
+const optionsFor = (iso) => fuel()?.days.find((d) => d.date === iso)?.mat_plan?.options || S.plan?.timetable?.[String(weekdayIdx(iso))] || [];
 
 function slotLine(d, s) {
   const e = d.mat_log?.[s.slot];
@@ -28,9 +29,10 @@ export function matCard(d) {
   if (!m) return "";
   if (m.skipped_by_rule) return `<section class="card"><h2>Mat</h2>${m.notes.map((n) => `<p class="adj">${esc(n)}</p>`).join("")}</section>`;
   return `<section class="card"><div class="lift-head"><h2>${m.kind === "double" ? "Double mat" : "One class"}</h2>
-      <button class="btn sm" data-a="matview" data-date="${d.date}">Warm-ups</button></div>
+      <div class="btnpair"><button class="btn sm ghost" data-a="matpicksheet" data-date="${d.date}">Classes…</button><button class="btn sm" data-a="matview" data-date="${d.date}">Warm-ups</button></div></div>
+    ${m.changed ? `<p class="adj">${esc(m.changed)}</p>` : ""}
     <div class="rows meal">${m.slots.map((s) => slotLine(d, s)).join("")}</div>
-    ${m.notes.map((n) => `<p class="adj">${esc(n)}</p>`).join("")}</section>`;
+    ${m.notes.filter((n) => n !== m.changed).map((n) => `<p class="adj">${esc(n)}</p>`).join("")}</section>`;
 }
 
 const mobilityDone = (date) => !!(S.plan?.mobility_log?.[date] || Object.values(store.get("done", {})).some((v) => v.date === date && String(v.key).startsWith("mobility")));

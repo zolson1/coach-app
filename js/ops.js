@@ -264,6 +264,20 @@ export function applyOps(f, ops, ctx = {}) {
         }
         break;
       }
+      case "mat_pick": {              // his classes show at once; the fuel and timeline follow on the rebuild
+        const d = day(o.date);
+        if (!d) break;
+        const mp = d.mat_plan = { ...(d.mat_plan || { notes: [], options: [] }) };
+        d.plan_pending = true;
+        if (o.clear) break;
+        if (o.none) { Object.assign(mp, { kind: null, slots: [], chosen_by: "you", notes: ["No mat today — your call."] }); break; }
+        const cs = [...(o.classes || [])].sort((a, b) => String(a.start).localeCompare(String(b.start)));
+        const lab = { muay_thai: "Muay Thai", open_mat: "Open mat", bjj_gi: "BJJ", bjj_nogi: "No-gi" };
+        Object.assign(mp, { kind: cs.length >= 2 ? "double" : "one", chosen_by: "you", notes: ["Your picks."],
+          slots: cs.map((c, i) => ({ slot: cs.length === 2 ? (c.discipline === "muay_thai" ? "mt" : "bjj") : cs.length > 2 ? `c${i + 1}` : "class",
+            label: lab[c.discipline] || "Class", class: c, warmups: c.discipline === "muay_thai" ? ["pre_mt", "neck_primer"] : ["pre_bjj", "neck_primer"] })) });
+        break;
+      }
       case "activity": {              // an activity shows on the day at once; it covers the Zone 2 on the rebuild
         const d = day(o.date);
         if (!d) break;

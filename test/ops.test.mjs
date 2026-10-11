@@ -163,3 +163,18 @@ test("plan edits: skip, move (both days), restore brings it home; an activity sh
   applyOps(f, [{ op: "activity", date: "2026-10-01", id: "tennis", remove: true }]);
   assert.deepEqual(f.days[1].activities, []);
 });
+
+test("mat picks: his classes replace the coach's at once; none clears the mat", () => {
+  const f = fuel();
+  f.days[1].mat_plan = { kind: "double", chosen_by: "coach", notes: [], options: [], slots: [] };
+  applyOps(f, [{ op: "mat_pick", date: "2026-10-01", classes: [
+    { start: "12:00", end: "13:00", name: "Muay Thai - All Levels", discipline: "muay_thai" },
+    { start: "10:30", end: "12:00", name: "BJJ Class - All Levels", discipline: "bjj_gi" }] }]);
+  const mp = f.days[1].mat_plan;
+  assert.equal(mp.kind, "double");
+  assert.deepEqual(mp.slots.map((s) => [s.slot, s.class.start]), [["bjj", "10:30"], ["mt", "12:00"]]);
+  assert.equal(mp.chosen_by, "you");
+  applyOps(f, [{ op: "mat_pick", date: "2026-10-01", none: true }]);
+  assert.equal(f.days[1].mat_plan.kind, null);
+  assert.deepEqual(f.days[1].mat_plan.slots, []);
+});

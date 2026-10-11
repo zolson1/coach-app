@@ -154,10 +154,10 @@ function holdHTML(b, i) {
   const target = b.max_s ? `${b.target_s}–${b.max_s} s` : `${b.target_s} s`;
   const loadField = b.track && b.track.endsWith("_lb") || b.load != null || b.load_note
     ? `<label class="inl">Load <input class="num" type="number" inputmode="decimal" data-a="holdload" data-b="${i}" value="${esc(st.load ?? "")}" placeholder="lb"> lb</label>` : "";
-  return `<section class="card hold"><div class="lift-head"><h2>${esc(b.title)}</h2><span class="tm">${esc(b.sets)} × ${esc(target)}${b.load_label ? ` · ${esc(b.load_label)}` : ""}</span></div>
+  return `<section class="card hold"><div class="lift-head"><h2>${esc(b.title)}</h2><span class="tm">${b.sides ? `${esc(b.sets / 2)} × ${esc(target)}/side` : `${esc(b.sets)} × ${esc(target)}`}${b.load_label ? ` · ${esc(b.load_label)}` : ""}</span></div>
     ${b.load_note ? `<p class="muted">${esc(b.load_note)}</p>` : ""}${loadField}
     ${cuesHTML(b)}
-    <div class="rows">${st.secs.map((x, j) => `<div class="row ${x != null ? "done" : ""}"><span class="k">${j + 1}</span>
+    <div class="rows">${st.secs.map((x, j) => `<div class="row ${x != null ? "done" : ""}"><span class="k">${b.sides ? `${j % 2 ? "R" : "L"}${Math.floor(j / 2) + 1}` : j + 1}</span>
       <span class="load">${x != null ? `${Math.round(x)} s` : "—"}</span><span class="plates">${b.implement ? esc(L.platesText(st.load || 0, b.implement, S.settings)) : ""}</span>
       <button class="btn sm ${x == null ? "primary" : ""}" data-a="hold" data-b="${i}" data-s="${j}">${x == null ? "▶ Hold" : "Redo"}</button></div>`).join("")}</div>
   </section>`;
@@ -166,7 +166,7 @@ function holdHTML(b, i) {
 function setsHTML(b, i) {
   const st = b.state;
   const loadField = b.track ? `<label class="inl">Load <input class="num" type="number" inputmode="decimal" data-a="setsload" data-b="${i}" value="${esc(st.load ?? "")}" placeholder="lb"> lb</label>` : "";
-  return `<section class="card sets"><div class="lift-head"><h2>${esc(b.title)}</h2><span class="tm">${esc(b.sets)} × ${esc(b.reps_label)}</span></div>
+  return `<section class="card sets"><div class="lift-head"><h2>${esc(b.title)}</h2><span class="tm">${esc(b.sets)} × ${esc(b.reps_label)}${b.load_label ? ` · ${esc(b.load_label)}` : ""}</span></div>
     ${loadField}${cuesHTML(b)}
     <div class="dots">${st.done.map((d, j) => `<button class="dot ${d ? "on" : ""}" data-a="setdone" data-b="${i}" data-s="${j}">${d ? "✓" : j + 1}</button>`).join("")}</div>
   </section>`;
@@ -297,13 +297,14 @@ function startRest(secs, next) {
 function holdFlow(bi, si) {
   const b = S.active.spec.blocks[bi];
   T.start({ kind: "leadin", label: "Get set", mode: "down", secs: 3, onDone: () => {
-    T.start({ kind: "hold", label: b.title, mode: "up", secs: b.target_s, max: b.max_s, sub: `Set ${si + 1} of ${b.sets}`,
+    T.start({ kind: "hold", label: b.title, mode: "up", secs: b.target_s, max: b.max_s,
+      sub: b.sides ? `${si % 2 ? "Right" : "Left"} side · round ${Math.floor(si / 2) + 1} of ${b.sets / 2}` : `Set ${si + 1} of ${b.sets}`,
       onStop: (elapsed) => {
         b.state.secs[si] = Math.round(elapsed);
         save(); render();
         const rest = b.rest_s ?? 60;
         if (!rest) return;                                   // mobility holds flow straight on
-        if (b.state.secs.some((x) => x == null)) startRest(rest, `${b.title} — set ${si + 2}`);
+        if (b.state.secs.some((x) => x == null)) startRest(rest, b.sides ? `${b.title} — ${si % 2 ? "left" : "right"} side` : `${b.title} — set ${si + 2}`);
         else startRest(rest, nextUp());
       } });
   } });
@@ -502,7 +503,7 @@ export function viewTrain() {
   const day = fuelDay(today());
   html += matCard(day) + mobilityCard();
   const keys = Object.keys(sessions).sort((x, y) => sessions[x].date.localeCompare(sessions[y].date));
-  if (keys.length) html += `<section class="card"><h2>This week</h2>${keys.map((k) => sessionButton(sessions[k], false)).join("")}</section>`;
+  html += `<section class="card"><div class="lift-head"><h2>This week</h2><button class="btn sm" data-a="weekview">Week plan</button></div>${keys.map((k) => sessionButton(sessions[k], false)).join("")}</section>`;
   const changes = (p.tm_changes || []).slice(-5).reverse();
   if (changes.length) {
     html += `<section class="card"><h2>Recent TM changes</h2><ul class="plain">${changes.map((c) =>

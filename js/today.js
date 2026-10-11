@@ -39,7 +39,7 @@ export function viewToday() {
     if (nx) {
       // the next thing from the live day: a meal (re-timed, with any rebalance) or a session
       const i = nx.item;
-      const notes = [i.moved && i.why ? i.why : null, ...(i.adjust || [])].filter(Boolean);
+      const notes = [i.moved && i.why ? i.why : null, ...(i.adjust || []), ...(i.notes || [])].filter(Boolean);
       if (i.kind === "train") {
         const spec = p?.sessions?.[i.session];
         html += `<section class="card next"><span class="eyebrow">Next · ${esc(i.at)}${i.until ? `–${esc(i.until)}` : ""}</span>

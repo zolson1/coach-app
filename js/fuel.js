@@ -63,7 +63,7 @@ function dayHTML(f, d) {
   html += timelineCard(d, { title: d.when === "today" ? "Today's timeline" : "Day timeline — meals and training", open: d.when === "future" });
 
   html += `<section class="card"><div class="lift-head"><h2>${esc(d.card.title)}</h2><span class="tm">${esc(d.card.totals)}</span></div>
-    <div class="rows meal">${d.card.rows.map((r) => rowHTML(d, r)).join("")}</div>
+    <div class="rows meal">${d.card.rows.map((r) => rowHTML(d, r) + (r.larder_notes && !d.log?.[r.slot] ? r.larder_notes.map((n) => `<p class="adj small">${esc(n)}</p>`).join("") : "")).join("")}</div>
     ${live && t.logged < t.rows ? `<button class="btn ghost" data-a="ateall" data-date="${d.date}">Mark the rest as eaten</button>` : ""}
     ${(d.card.notes || []).length ? `<details class="cues" ${d.when === "today" ? "open" : ""}><summary>Notes for this day</summary><ul class="plain">${d.card.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul></details>` : ""}
   </section>`;
@@ -123,6 +123,7 @@ SHEETS.row = (sh) => {
   const recipe = recipeFor(r);
   return `<div class="sheet"><h3>${esc(r.time)} — ${esc(dayLabel(d.date))}</h3>
     <p>${esc(r.what)}</p>${r.planned ? `<p class="muted small">Planned: ${esc(r.planned)}</p>` : ""}<p class="muted">${esc(macroLine(r))}</p>
+    ${r.card_what ? `<p class="muted small">The card says: ${esc(r.card_what)}</p>` : ""}${(r.larder_notes || []).map((n) => `<p class="adj">${esc(n)}</p>`).join("")}
     ${e?.status === "swapped" ? `<p class="adj">Swapped for: ${esc(e.swap.what)} (${esc(macroLine(e.swap))})</p>` : ""}
     ${r.company ? companyControl(d, r) + companyDetail(r) : ""}
     <div class="choices">

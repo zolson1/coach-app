@@ -7,6 +7,9 @@ import { dayOf, dayLabel, tasksHTML, macroLine, emptyState } from "./ui.js";
 
 const TABS = [["stock", "Stock"], ["shop", "Shop"], ["pantry", "Pantry"], ["menu", "Menu"]];
 const when = (iso) => (iso ? dayLabel(iso) : "—");
+const plural = (u) => (/(bottle|tub|bag|carton|jar)$/.test(u) ? u + "s" : u);
+const packs = (n) => { const w = Math.floor(n), f = n - w; const fr = { 0.25: "¼", 0.5: "½", 0.75: "¾" }[Math.round(f * 4) / 4] || "";
+  return w ? `${w}${fr}` : fr || "0"; };
 const inDays = (n) => (n === 0 ? "today" : n === 1 ? "tomorrow" : `in ${n} days`);
 
 export function viewKitchen() {
@@ -72,9 +75,9 @@ function larderCard(f) {
   return `<section class="card"><div class="lift-head"><h2>Larder — raw ingredients</h2><button class="btn sm" data-a="lardercount">Count</button></div>
     ${L.counted ? "" : `<p class="adj">Not counted yet. Count what's on hand once (tap Count) — from then cooks and meals draw it down on their own, and the shopping lists turn exact.</p>`}
     ${groups.map(([sh, g]) => `<h3 class="sub">${SHELF[sh]}</h3>${g.map(([k, v]) => `<button class="batch row-btn" data-a="larderset" data-k="${esc(k)}">
-      <div class="b-main"><b>${esc(v.label)}</b><span class="muted small">${v.pending ? "updating…" : v.runs_out ? `runs out ${esc(when(v.runs_out))}${v.urgent ? " — before the next trip" : ""}` : v.have == null ? "not counted" : `${esc(v.need_txt)} needed by ${esc(when(v.until))}`}</span></div>
-      <span class="count ${v.urgent ? "warn-text" : ""}">${esc(v.have == null ? "—" : v.have_txt)}</span></button>`).join("")}`).join("")}
-    <p class="muted small">Logging a cook takes its recipe's ingredients; each morning's card takes its fresh staples; a skip gives them back.</p>
+      <div class="b-main"><b>${esc(v.label)}</b><span class="muted small">${v.pending ? "updating…" : v.check ? "that count looks off — recount it in " + esc(plural(v.count_unit)) : v.runs_out ? `runs out ≈${esc(when(v.runs_out))}${v.urgent ? " — before the next trip" : ""}` : v.have == null ? "not counted" : `${esc(v.need_txt)} needed by ${esc(when(v.until))}`}</span></div>
+      <span class="count ${v.urgent || v.check ? "warn-text" : ""}">${esc(v.have == null ? "—" : v.count_unit ? (v.have_packs ? `≈${packs(v.have_packs)} ${v.have_packs > 1 ? plural(v.count_unit) : v.count_unit}` : "none") : v.have_txt)}</span></button>`).join("")}`).join("")}
+    <p class="muted small">Rough is fine: counts are estimates, cooks and each morning's card draw them down, a skip gives them back, and nothing goes below zero. When a meal needs something you're out of, the plan swaps in something you have. Recount whenever it feels off.</p>
   </section>`;
 }
 
@@ -82,9 +85,11 @@ SHEETS.larder = (sh) => {
   const L = fuel().kitchen.larder;
   const keys = sh.k ? [sh.k] : Object.keys(L.items);
   return `<div class="sheet"><h3>${sh.k ? esc(L.items[sh.k].label) : "Count the larder"}</h3>
-    <p class="muted small">What's actually there. Leave one blank to skip it.</p>
-    <div class="countgrid">${keys.map((k) => { const v = L.items[k]; return `<label class="fld">${esc(v.label)} <span class="muted small">(${esc(v.unit === "each" ? "count" : v.unit)})</span>
-      <input type="number" inputmode="decimal" step="any" data-k="${esc(k)}" class="larderin" value="${v.have == null ? "" : esc(v.have)}"></label>`; }).join("")}</div>
+    <p class="muted small">Roughly what's there — eyeball it. Half a tub is 0.5. Leave one blank to skip it.</p>
+    <div class="countgrid">${keys.map((k) => { const v = L.items[k]; const pk = !!v.count_unit;
+      return `<label class="fld">${esc(v.label)} <span class="muted small">(${esc(pk ? plural(v.count_unit) : v.unit === "each" ? "count" : v.unit)})</span>
+      <input type="number" inputmode="decimal" step="${pk ? "0.25" : "any"}" data-k="${esc(k)}" data-per="${pk ? esc(v.count_per) : ""}" class="larderin"
+        value="${v.have == null ? "" : esc(pk ? v.have_packs : v.have)}"></label>`; }).join("")}</div>
     <div class="sheet-foot"><button class="btn ghost" data-a="closesheet">Cancel</button>
       <button class="btn primary" data-a="lardersave">Save</button></div></div>`;
 };
@@ -370,11 +375,12 @@ Object.assign(A, {
   lardersave() {
     const items = {};
     for (const el of document.querySelectorAll(".larderin")) {
-      const k = el.dataset.k, v = el.value.trim();
-      const had = fuel().kitchen.larder.items[k]?.have;
+      const k = el.dataset.k, v = el.value.trim(), per = Number(el.dataset.per) || 0;
+      const it = fuel().kitchen.larder.items[k];
+      const had = per ? it?.have_packs : it?.have;
       if (v === "" && had == null) continue;
       if (v !== "" && Number(v) === had) continue;
-      items[k] = v === "" ? null : Number(v);
+      items[k] = v === "" ? null : per ? Math.round(Number(v) * per * 100) / 100 : Number(v);      // packs → the base unit
     }
     sheet(null);
     if (Object.keys(items).length) send({ op: "larder_set", items, date: today() });

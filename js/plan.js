@@ -8,8 +8,8 @@ import { S, A, SHEETS, esc, fuel, send, sheet, render, renderSheet, today, store
 import { dayOf, dayLabel, statusLine } from "./ui.js";
 
 export const SESSION_NAME = { strength_a: "Strength A", strength_b: "Strength B", domain: "Domain Day (Breacher)",
-  lic: "Zone 2", loaded_mobility: "Loaded mobility", mobility_pm: "Mobility PM", rest: "Rest", hic: "Hard conditioning" };
-const ADDABLE = ["lic", "domain", "loaded_mobility", "strength_a", "strength_b", "mobility_pm"];
+  lic: "Zone 2", loaded_mobility: "Loaded mobility", mobility_pm: "Mobility PM", rest: "Rest", hic: "VO2 4×4" };
+const ADDABLE = ["lic", "hic", "domain", "loaded_mobility", "strength_a", "strength_b", "mobility_pm"];
 const INTENSITY = { easy: "Easy — counts as Zone 2", moderate: "Moderate — counts as Zone 2", hard: "Hard — a hard session" };
 const MAT = { none: "No class", one: "One class", double: "BJJ + Muay Thai" };
 

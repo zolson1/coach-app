@@ -3,12 +3,12 @@
 // around eating (level override, eating out, the sweat test).
 import { S, A, SHEETS, esc, fuel, send, sheet, render, renderSheet, today, ask, requests, store, fmtNum, uid } from "./core.js";
 import { levelChip, dayOf, dayLabel, statusLine, macroLine, LEVEL_NAME, companyControl, companyDetail } from "./ui.js";
-import { dayTotals, sweat } from "./ops.js";
+import { livedTotals, dayTotals, sweat } from "./ops.js";
 import { timelineCard, nowMin } from "./day.js";
 import { hm } from "./timeline.js";
 
 const SESSION_NAME = { strength_a: "Strength A", strength_b: "Strength B", domain: "Domain Day", lic: "Zone 2",
-  loaded_mobility: "Loaded mobility", mobility_pm: "Mobility", rest: "Rest" };
+  loaded_mobility: "Loaded mobility", mobility_pm: "Mobility", rest: "Rest", hic: "VO2 4×4" };
 const SUPPS = [["creatine", "Creatine 5 g — breakfast"], ["omega3", "Omega-3, 2 softgels — dinner"], ["magnesium", "Magnesium glycinate — before bed"]];
 
 const selDate = () => (S.fuelDate && dayOf(S.fuelDate) ? S.fuelDate : today());
@@ -46,8 +46,7 @@ function dayHTML(f, d) {
     ${d.when !== "past" ? `<div class="toolrow"><button class="btn sm ghost" data-a="plansheet" data-date="${d.date}">Edit training…</button>
       ${["SHIFT", "OT-DAY", "OT-NIGHT"].includes(d.leave?.base || d.day_type) ? `<button class="btn sm ghost" data-a="leavesheet" data-date="${d.date}">Leave…</button>` : ""}</div>` : ""}
     ${d.sleep_gated && d.when === "future" ? `<p class="muted small">Sleep-gated: 3–6 h on shift drops this a level; under 3 h makes it F1.</p>` : ""}
-    ${live ? `<div class="meter" title="protein"><i style="width:${Math.min(100, (t.protein / (f.protein_floor || 200)) * 100)}%"></i></div>
-      <p class="muted small">Logged ${t.logged} of ${t.rows} · ${fmtNum(t.kcal)} of ${fmtNum(t.plan_kcal)} kcal · ${t.protein} g protein (floor ${f.protein_floor})</p>` : ""}
+    ${live ? (() => { const l = livedTotals(d); return `<p class="muted small">${l.changes ? `With your ${l.changes} change${l.changes > 1 ? "s" : ""}: ≈${fmtNum(l.kcal)} of ${fmtNum(t.plan_kcal)} kcal · ${l.protein} g protein (floor ${f.protein_floor})` : `Eating to plan — ≈${fmtNum(t.plan_kcal)} kcal · ${t.plan_protein} g protein. Log only what changes.`}</p>`; })() : ""}
   </section>`;
 
   const company = d.card.rows.filter((r) => r.company);
@@ -64,7 +63,6 @@ function dayHTML(f, d) {
 
   html += `<section class="card"><div class="lift-head"><h2>${esc(d.card.title)}</h2><span class="tm">${esc(d.card.totals)}</span></div>
     <div class="rows meal">${d.card.rows.map((r) => rowHTML(d, r) + (r.larder_notes && !d.log?.[r.slot] ? r.larder_notes.map((n) => `<p class="adj small">${esc(n)}</p>`).join("") : "")).join("")}</div>
-    ${live && t.logged < t.rows ? `<button class="btn ghost" data-a="ateall" data-date="${d.date}">Mark the rest as eaten</button>` : ""}
     ${(d.card.notes || []).length ? `<details class="cues" ${d.when === "today" ? "open" : ""}><summary>Notes for this day</summary><ul class="plain">${d.card.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul></details>` : ""}
   </section>`;
 
@@ -127,9 +125,9 @@ SHEETS.row = (sh) => {
     ${e?.status === "swapped" ? `<p class="adj">Swapped for: ${esc(e.swap.what)} (${esc(macroLine(e.swap))})</p>` : ""}
     ${r.company ? companyControl(d, r) + companyDetail(r) : ""}
     <div class="choices">
-      ${live ? `<button class="btn primary big" data-a="meal" data-status="eaten">Ate it${e?.ate_at ? "" : " (as planned)"}</button>
+      ${live ? `<p class="muted small">Not logged = eaten as planned. Only tell it what changed.</p>
         <div class="two"><label class="fld">Ate it at<input type="time" id="ateat" value="${esc(e?.ate_at || (d.when === "today" ? hm(nowMin()) : ""))}"></label>
-          <button class="btn" data-a="ateat">Ate it at this time</button></div>` : ""}
+          <button class="btn" data-a="ateat">At a different time</button></div>` : ""}
       <button class="btn big" data-a="swapsheet">${live ? "Had something else…" : "Plan a swap…"}</button>
       <button class="btn big" data-a="meal" data-status="skipped">${live ? "Skipped it" : "Will skip it"}</button>
       ${e ? `<button class="btn ghost" data-a="meal" data-status="clear">Clear</button>` : ""}

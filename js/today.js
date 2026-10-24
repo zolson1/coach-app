@@ -2,22 +2,23 @@
 // what the kitchen needs tonight, and whether anything wants attention.
 import { S, A, esc, fuel, send, today, fmtNum, pendingCount } from "./core.js";
 import { levelChip, dayOf, statusLine, tasksHTML, macroLine, LEVEL_NAME, companyControl, companyDetail } from "./ui.js";
-import { dayTotals, nextRow } from "./ops.js";
+import { dayTotals, nextRow, livedTotals } from "./ops.js";
 import { sessionButton } from "./train.js";
 import { matCard, mobilityCard } from "./mat.js";
 import { fixPending } from "./fix.js";
 import { timelineCard, nextOf, workCard } from "./day.js";
 import { suggestionsCard } from "./plan.js";
+import { freshBanner, healthCard, weekCard } from "./health.js";
 
 export function viewToday() {
   const p = S.plan;
   const f = fuel();
   const d = f ? dayOf(today()) : null;
   const t = p?.today && p.today.date === today() ? p.today : null;
-  let html = "";
+  let html = freshBanner();
 
   if (d) {
-    const lv = d.level, tot = dayTotals(d);
+    const lv = d.level, tot = dayTotals(d), lived = livedTotals(d);
     const r = t?.readiness || {};
     const sleep = r.sleep_last_night_h != null ? `slept ${r.sleep_last_night_h} h` : null;
     const fixing = fixPending();
@@ -27,8 +28,7 @@ export function viewToday() {
         <div class="btnpair"><button class="btn sm" data-a="asksheet">Ask</button><button class="btn sm" data-a="fixsheet">Fix</button></div></div>
       ${fixing.length ? `<p class="adj">Fix sent (${esc(fixing.map((o) => o.op === "report_sleep" ? `slept ${o.hours} h` : o.op === "schedule_override" ? `today is ${o.type.toLowerCase()}` : o.op === "neck_sore" ? "neck sore" : "neck fine").join(", "))}) — today rebuilds in about a minute.</p>` : ""}
       ${(lv.why || []).map((w) => `<p class="adj">${esc(w)}</p>`).join("")}
-      <div class="meter" title="protein"><i style="width:${Math.min(100, (tot.protein / (f.protein_floor || 200)) * 100)}%"></i></div>
-      <p class="muted small">${tot.logged} of ${tot.rows} meals logged · ${tot.protein} of ${f.protein_floor} g protein</p></section>`;
+      <p class="muted small">${lived.changes ? `With your ${lived.changes} change${lived.changes > 1 ? "s" : ""}: ≈${fmtNum(lived.kcal)} kcal · ${lived.protein} g protein` : "Eating to plan — log only what changes."}</p></section>`;
 
     html += workCard(d);
     html += suggestionsCard();
@@ -45,17 +45,17 @@ export function viewToday() {
         html += `<section class="card next"><span class="eyebrow">Next · ${esc(i.at)}${i.until ? `–${esc(i.until)}` : ""}</span>
           <h2>${esc(i.label)}</h2>${notes.map((n) => `<p class="adj">${esc(n)}</p>`).join("")}
           <div class="two">${spec ? `<button class="btn primary" data-a="open" data-k="${esc(i.session)}">Start</button>` : ""}
-            ${i.train === "activity" ? `<button class="btn" data-a="actsheet" data-date="${d.date}" data-id="${esc(i.activity)}">Done / moved / skipped…</button>`
-              : i.train === "mat" ? `<button class="btn" data-a="classsheet" data-date="${d.date}" data-slot="${esc(i.session.replace(/^mat_/, ""))}">Class done / swapped…</button>`
-              : `<button class="btn" data-a="sesssheet" data-date="${d.date}" data-id="${esc(i.id)}">Done / moved / skipped…</button>`}</div>
+            ${i.train === "activity" ? `<button class="btn" data-a="actsheet" data-date="${d.date}" data-id="${esc(i.activity)}">Moved or skipped?</button>`
+              : i.train === "mat" ? `<button class="btn" data-a="classsheet" data-date="${d.date}" data-slot="${esc(i.session.replace(/^mat_/, ""))}">Different class or skipped?</button>`
+              : `<button class="btn" data-a="sesssheet" data-date="${d.date}" data-id="${esc(i.id)}">Moved or skipped?</button>`}</div>
           ${dinner ? companyControl(d, dinner, dinnerAt) + companyDetail(dinner) : ""}</section>`;
       } else {
         const row = d.card.rows.find((r) => r.slot === i.slot) || {};
         html += `<section class="card next"><span class="eyebrow">Next · ${esc(i.at)}${i.moved ? ` <s>${esc(row.time || "")}</s>` : ""}</span>
           <h2>${esc(i.label || i.what)}</h2><p class="muted">${esc(macroLine(i.eff ? { ...i.eff, kcal: Math.round(i.eff.kcal) } : i))}</p>
           ${notes.map((n) => `<p class="adj">${esc(n)}</p>`).join("")}${companyDetail(row)}
-          <div class="two"><button class="btn primary" data-a="atenext" data-slot="${esc(i.slot)}" data-at="${esc(i.at)}">Ate it</button>
-            <button class="btn" data-a="devsheet" data-date="${d.date}" data-slot="${esc(i.slot)}">Ate something else</button></div>
+          <div class="two"><button class="btn" data-a="devsheet" data-date="${d.date}" data-slot="${esc(i.slot)}">Ate something else</button>
+            <button class="btn ghost" data-a="rowsheet" data-date="${d.date}" data-slot="${esc(i.slot)}">Different time / skipped</button></div>
           ${dinner ? companyControl(d, dinner, dinnerAt) + (dinner.slot === i.slot ? "" : companyDetail(dinner)) : ""}</section>`;
       }
       html += timelineCard(d);
@@ -63,11 +63,11 @@ export function viewToday() {
     const next = nextRow(d, now.getHours() * 60 + now.getMinutes());
     html += next ? `<section class="card next"><span class="eyebrow">Next · ${esc(next.time)}</span>
         <h2>${esc(next.what)}</h2><p class="muted">${esc(macroLine(next))}</p>${companyDetail(next)}
-        <div class="two"><button class="btn primary" data-a="atenext" data-slot="${esc(next.slot)}">Ate it</button>
-          <button class="btn" data-a="tab" data-t="fuel">The whole card</button></div>
+        <div class="two"><button class="btn" data-a="devsheet" data-date="${d.date}" data-slot="${esc(next.slot)}">Ate something else</button>
+          <button class="btn ghost" data-a="tab" data-t="fuel">The whole card</button></div>
         ${dinner ? companyControl(d, dinner) + (dinner === next ? "" : companyDetail(dinner)) : ""}</section>`
-      : `<section class="card next"><span class="eyebrow">Food</span><h2>Every meal is logged.</h2>
-        <p class="muted">${fmtNum(tot.kcal)} kcal · ${tot.protein} g protein today.</p></section>`;
+      : `<section class="card next"><span class="eyebrow">Food</span><h2>That's the day's food.</h2>
+        <p class="muted">≈${fmtNum(lived.kcal)} kcal · ${lived.protein} g protein today.</p></section>`;
     }
   } else if (f && !f.started) {
     html += `<section class="card"><h2>The fuel plan starts ${esc(f.start)}</h2></section>`;
@@ -86,6 +86,7 @@ export function viewToday() {
     ${!d?.mat_plan && !runnable.length && !(d?.sessions || t?.sessions || []).includes("lic") && !(d?.activities || []).length ? `<p class="muted">Nothing scheduled${t ? "" : " — today's plan arrives with the morning run"}.</p>` : ""}
     ${t?.deviation ? `<p class="warn-text">${esc(t.deviation)}</p>` : ""}</section>`;
   html += mobilityCard();
+  html += weekCard() + healthCard();
 
   if (d) {
     const tasks = tasksHTML(d);

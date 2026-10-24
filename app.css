@@ -384,3 +384,6 @@ button.tl-row:active { background: var(--card-2); }
 .countgrid { display: grid; gap: 8px; max-height: 55vh; overflow-y: auto; margin-bottom: 8px; }
 .wk-row { margin: 2px 0; }
 .wk .badge { font-style: normal; }
+.hgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; margin: 4px 0 6px; }
+.hcell { display: grid; gap: 1px; padding: 8px 10px; border-radius: 10px; background: var(--card-2); border: 1px solid var(--line); }
+.hcell b { font-size: 1.15rem; }

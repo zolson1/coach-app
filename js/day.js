@@ -38,6 +38,7 @@ function tlRow(d, i) {
     ...(i.adjust || []), ...(i.notes || []),
     r?.company === "shared" && r.for_two ? r.for_two : null,
     r?.company === "away" && r.away_note ? r.away_note : null,
+    i.kind === "train" && (d.session_log?.[i.session]?.auto || d.mat_log?.[String(i.session || "").replace(/^mat_/, "")]?.auto) ? "✓ from your watch" : null,
   ].filter(Boolean);
   const macro = eating && i.eff && (i.eff.kcal || i.eff.protein) ? `${fmtNum(Math.round(i.eff.kcal))} kcal · ${Math.round(i.eff.protein)} g P` : "";
   const label = i.kind === "train" || i.kind === "sleep" || i.kind === "work" ? i.label : (i.label || i.what);

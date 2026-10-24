@@ -19,7 +19,7 @@ function slotLine(d, s) {
   return `<button class="row mealrow ${e?.status || ""}" data-a="classsheet" data-date="${d.date}" data-slot="${esc(s.slot)}">
     <span class="k">${esc(s.label)}</span>
     <span class="load">${esc(what)}${e?.status === "swapped" && s.class ? ` <s>${esc(s.class.name)}</s>` : ""}</span>
-    <span class="plates">${e ? esc(STATUS[e.status] || e.status) : ""}</span>
+    <span class="plates">${e ? esc(e.auto ? "Done · watch" : STATUS[e.status] || e.status) : ""}</span>
     <span class="chk ${e?.status || ""}">${ICON[e?.status] || ""}</span></button>`;
 }
 

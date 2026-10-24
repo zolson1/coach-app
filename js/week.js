@@ -47,10 +47,27 @@ function trainLines(d) {
   return rows.join("");
 }
 
+// A day that's happened: what the watch saw against what was planned. Nothing to log.
+const KIND = { mat: "🥋", strength: "🏋", aerobic: "🚴", mobility: "🧘", other: "•" };
+function pastLine(d) {
+  const a = d.actual || { activities: [] };
+  const seen = (a.activities || []).map((x) => `${KIND[x.kind] || "•"} ${x.name || x.type} ${x.minutes} min`);
+  const slots = (d.mat_plan?.slots || []).filter((s) => !d.mat_log?.[s.slot]);
+  const sess = (d.sessions || []).filter((k) => !["rest", "mobility_pm"].includes(k) && !d.session_log?.[k]);
+  const missed = [...slots.map((s) => s.label), ...sess.map((k) => SESSION_NAME[k] || k)];
+  return `<div class="workrow"><p><b>${esc(dayLabel(d.date, { short: true }))}</b> <span class="muted">· ${esc(statusLine(d))}</span></p>
+    <p class="small">${seen.length ? esc(seen.join(" · ")) : `<span class="muted">Nothing recorded on the watch.</span>`}</p>
+    ${missed.length ? `<p class="muted small">Planned, not seen: ${esc(missed.join(", "))}</p>` : ""}</div>`;
+}
+
 export function viewWeek() {
   const f = fuel();
   const days = (f?.days || []).filter((d) => d.date >= today()).slice(0, 7);
+  const mon = (() => { const t = new Date(today() + "T12:00:00"); t.setDate(t.getDate() - ((t.getDay() + 6) % 7)); return t.toISOString().slice(0, 10); })();
+  const past = (f?.days || []).filter((d) => d.date >= mon && d.date < today());
   let html = `${header("This week", "Work, classes and training", back())}<main class="wrap">${flashHTML()}`;
+  if (past.length) html += `<section class="card"><h2>So far this week</h2>${past.map(pastLine).join("")}
+    <p class="muted small">From your watch, the morning after. Record classes and rides on it.</p></section>`;
   if (!days.length) return html + `<p class="muted">The week loads with the next plan.</p></main>`;
   for (const d of days) {
     const work = workLine(d);

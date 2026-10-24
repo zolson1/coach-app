@@ -341,6 +341,22 @@ export function dayTotals(d) {
   return out;
 }
 
+// The day as he's living it: the card, with only what he logged changed (a swap, a skip,
+// something extra). Nothing logged = eaten as planned — he logs deviations, not meals.
+export function livedTotals(d) {
+  const out = { kcal: 0, protein: 0, changes: 0 };
+  for (const r of d.card?.rows || []) {
+    if (r.session || r.kcal == null) continue;
+    const e = d.log?.[r.slot];
+    if (e && e.status !== "eaten") out.changes++;
+    const src = e?.status === "skipped" ? {} : e?.status === "swapped" && e.swap ? e.swap : r;
+    out.kcal += num(src.kcal);
+    out.protein += num(src.protein);
+  }
+  for (const x of d.off_card || []) { out.kcal += num(x.kcal); out.protein += num(x.protein); out.changes++; }
+  return { kcal: Math.round(out.kcal), protein: Math.round(out.protein), changes: out.changes };
+}
+
 // The clock time a row is meant for, in minutes — null when it has none ("during").
 export function rowMinutes(r) {
   const m = /(\d{1,2}):(\d{2})/.exec(r.time || "");

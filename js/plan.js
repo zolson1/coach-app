@@ -38,7 +38,10 @@ export function suggestionsCard() {
   if (!list.length) return "";
   return `<section class="card"><h2>Looking ahead</h2>
     ${list.map((s) => `<div class="workrow"><p><b>${esc(s.title)}</b></p><p class="muted small">${esc(s.text)}</p>
-      ${s.ops?.length ? `<div class="toolrow"><button class="btn sm primary" data-a="sugdo" data-id="${esc(s.id)}">Do it</button>
+      ${s.kind === "fuel" ? `<div class="toolrow">${s.ops?.length ? `<button class="btn sm primary" data-a="sugdo" data-id="${esc(s.id)}">Apply it</button>` : ""}
+        <button class="btn sm ghost" data-a="tab" data-t="progress">The numbers</button>
+        <button class="btn sm ghost" data-a="sugno" data-id="${esc(s.id)}">${s.ops?.length ? "Not now" : "Got it"}</button></div>`
+      : s.ops?.length ? `<div class="toolrow"><button class="btn sm primary" data-a="sugdo" data-id="${esc(s.id)}">Do it</button>
         <button class="btn sm ghost" data-a="plansheet" data-date="${esc(s.dates[0])}">Edit ${esc(short(s.dates[0]).replace(/^To(day|morrow)$/, (m) => m.toLowerCase()))}…</button>
         <button class="btn sm ghost" data-a="sugno" data-id="${esc(s.id)}">Not this time</button></div>`
       : `<div class="toolrow"><button class="btn sm" data-a="matpicksheet" data-date="${esc(s.dates[0])}">Classes…</button>

@@ -36,6 +36,7 @@ export function healthCard() {
       ${cell("Weight", w.avg7 ? `≈${w.avg7} lb` : "—", w.last ? `weighed ${when(w.last[0])}` : "no weigh-ins", false)}
     </div>
     ${h.waist ? `<p class="muted small">Waist ${esc(h.waist.inches)}" (${esc(when(h.waist.date))}) — the target is under 36".</p>` : ""}
+    ${(() => { const c = S.plan?.fuel?.review?.verdict?.check; return c ? `<p class="muted small">Calorie check since ${esc(dayLabel(c.since, { short: true }))}: ${c.weighins} of ${c.need} weigh-ins, ${c.span} of ${c.need_span} days — the verdict lands here and in Looking ahead.</p>` : ""; })()}
   </section>`;
 }
 

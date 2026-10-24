@@ -38,14 +38,19 @@ export function matCard(d) {
 const mobilityDone = (date) => !!(S.plan?.mobility_log?.[date] || Object.values(store.get("done", {})).some((v) => v.date === date && String(v.key).startsWith("mobility")));
 
 export function mobilityCard(date = today()) {
-  if (!S.plan?.routines) return "";
+  const r = S.plan?.routines;
+  if (!r) return "";
   const done = mobilityDone(date);
   const log = S.plan.mobility_log?.[date];
-  return `<section class="card"><div class="lift-head"><h2>Daily mobility${done ? " ✓" : ""}</h2><span class="tm">7–8 min</span></div>
+  const hc = S.plan.hip_check;
+  const due = hc && r.hip_check && hc.due <= today();
+  return `<section class="card"><div class="lift-head"><h2>${esc(r.mobility.title)}${done ? " ✓" : ""}</h2><span class="tm">${esc(r.mobility.subtitle)}</span></div>
     ${log ? `<p class="muted small">Deep squat ${Math.round(log.deep_squat_s || 0)} s · dead hang ${Math.round(log.dead_hang_s || 0)} s</p>` : ""}
     <div class="two"><button class="btn ${done ? "" : "primary"}" data-a="open" data-k="mobility">${done ? "Again" : "Start"}</button>
       <button class="btn" data-a="open" data-k="mobility_min">3-min minimum</button></div>
-    <p class="muted small">Any time except right before lifting, power work or sparring.</p></section>`;
+    ${due ? `<button class="btn big" data-a="open" data-k="hip_check">Hip check — ${hc.last ? "due" : "take the first one"} (5 min)</button>` : ""}
+    ${hc?.last ? `<p class="muted small">Last hip check ${esc(L.fmtDate(hc.last.date))}: ${hc.last.n} of ${hc.last.of} passed${hc.history.length > 1 ? ` (was ${hc.history[hc.history.length - 2].n})` : ""} · next ${esc(L.fmtDate(hc.due))}.</p>` : ""}
+    <p class="muted small">After class, a lift, or in the evening — not right before lifting, power work or sparring.</p></section>`;
 }
 
 // ------------------------------------------------------------- the mat screen

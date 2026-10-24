@@ -206,7 +206,7 @@ export function sessionStatus(active) {
 
 export function buildLog(active, id) {
   const s = active.spec;
-  const lifts = [], holds = [], setsItems = [], sequences = [];
+  const lifts = [], holds = [], setsItems = [], sequences = [], checks = [];
   for (const b of s.blocks) {
     if (b.type === "lift") {
       const isSingle = b.id.startsWith("single_") || b.log_as === "single";      // heavy singles, Breacher primers
@@ -231,6 +231,8 @@ export function buildLog(active, id) {
       if (n && b.track && b.state.load) holds.push({ id: b.id, track: b.track, load: b.state.load, sets_s: [] });
     } else if (b.type === "sequence") {
       sequences.push({ id: b.id, done: !!b.state.done });
+    } else if (b.type === "checklist") {       // a test's ticks are its result (the hip check)
+      checks.push({ id: b.id, items: b.items.map((x) => ({ ...(x.id ? { id: x.id } : {}), text: x.text, done: !!x.done })) });
     }
   }
   return {
@@ -238,6 +240,6 @@ export function buildLog(active, id) {
     scheduled_date: s.date, block: s.block, week: s.week, block_key: s.block_key, deload: s.deload,
     adjustment_week: s.adjustment_week, started: active.started, finished: new Date().toISOString(),
     status: sessionStatus(active), sets_planned: active.setsChoice || null,
-    lifts, holds, sets_items: setsItems, sequences, note: active.note || null,
+    lifts, holds, sets_items: setsItems, sequences, checks, note: active.note || null,
   };
 }

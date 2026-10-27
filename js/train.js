@@ -2,7 +2,7 @@
 // ramps with plate math, RPE logging with in-session load cuts, rest / hold /
 // guided-sequence timers, calibration ladders, notes.
 import { S, A, INPUTS, SHEETS, L, T, store, root, bar, esc, today, save, policy, queue, doneLog,
-  header, flashHTML, render, renderSheet, flushAll, fuel, send } from "./core.js";
+  header, flashHTML, render, renderSheet, sheet, flushAll, fuel, send } from "./core.js";
 import { matCard, mobilityCard } from "./mat.js";
 const fuelDay = (iso) => fuel()?.days.find((d) => d.date === iso) || null;
 
@@ -35,6 +35,66 @@ function elapsedText() {
   return L.fmtClock(s);
 }
 
+// ------------------------------------------------------------ cut rules (a busy shift)
+// Zach, 2026-10-27: one session per shift, and a threshold for cutting it short — decided by the
+// clock, not willpower (program.SHIFT_CUT_RULES). Back after a gap, the app makes the call.
+const LIFTING = ["strength", "domain"];
+function lastTouch(a) {
+  const ts = [a.started];
+  for (const b of a.spec.blocks) {
+    if (b.type !== "lift") continue;
+    for (const w of b.work) if (w.at) ts.push(w.at);
+    for (const l of b.state?.ladder || []) if (l.at) ts.push(l.at);
+  }
+  return Math.max(...ts.map((t) => new Date(t).getTime()).filter((x) => !Number.isNaN(x)));
+}
+const CUT = {
+  resume: { title: "Pick up where you left off", text: "One ramp set at ~70% of your next load first, then carry on." },
+  short: { title: "The short version", text: "Finish the lift you were on, then ONE top set of each lift left. Finishers off — keep Nordics + Copenhagens if 5 min remain." },
+  stop: { title: "Done lifting today", text: "10 minutes free and feeling fine → the hip routine. Otherwise stop. It counts — nothing gets made up." },
+  rpe: { title: "Heavy day — finish this lift, then hips", text: "The first work set read RPE 9+ on a 75–80% day. Finish this lift's sets, skip the rest, do the hip routine." },
+};
+function cutBanner(a) {
+  if (!LIFTING.includes(a.spec.kind) || a.cut) return "";
+  const lifts = a.spec.blocks.filter((b) => b.type === "lift");
+  const started = lifts.some((b) => b.work.some((w) => w.done));
+  const open = lifts.some((b) => b.work.some((w) => !w.done && !w.skipped));
+  if (!started || !open) return `<div class="toolrow"><button class="btn sm ghost" data-a="cutsheet">Called away?</button></div>`;
+  const gap = (Date.now() - lastTouch(a)) / 60000;
+  if (gap < 20 || (a.cutAck && Date.now() - a.cutAck < 15 * 60000)) {
+    return `<div class="toolrow"><button class="btn sm ghost" data-a="cutsheet">Called away?</button></div>`;
+  }
+  const k = gap < 60 ? "short" : "stop";
+  return `<section class="card alert"><h2>Back after ${Math.round(gap)} min — ${esc(CUT[k].title.toLowerCase())}</h2>
+    <p>${esc(CUT[k].text)}</p>
+    <div class="toolrow"><button class="btn sm primary" data-a="cutapply" data-k="${k}">${k === "short" ? "Trim the rest" : "Stop here"}</button>
+      <button class="btn sm ghost" data-a="cutapply" data-k="resume">I'm fine — carry on</button></div></section>`;
+}
+
+SHEETS.cut = () => `<div class="sheet"><h3>Called away?</h3>
+  <p class="muted small">The cut rules for a busy shift. Pick what happened — the session adjusts.</p>
+  ${[["resume", "Back in under 20 min"], ["short", "Gone 20–60 min"], ["stop", "Over 60 min, a working fire, or a hard EMS run"],
+     ["rpe", "First work set felt like RPE 9+"]].map(([k, l]) => `<button class="option" data-a="cutapply" data-k="${k}"><b>${esc(l)}</b><span class="muted">${esc(CUT[k].title)} — ${esc(CUT[k].text)}</span></button>`).join("")}
+  <button class="btn ghost" data-a="closesheet">Close</button></div>`;
+
+function applyCut(a, k) {
+  const lifts = a.spec.blocks.filter((b) => b.type === "lift");
+  const cur = lifts.find((b) => b.work.some((w) => w.done) && b.work.some((w) => !w.done && !w.skipped)) ||
+              lifts.find((b) => b.work.some((w) => !w.done && !w.skipped));
+  const after = cur ? lifts.slice(lifts.indexOf(cur) + 1) : [];
+  const skip = (w, why) => { if (!w.done && !w.skipped) { w.skipped = true; w.skipReason = why; } };
+  if (k === "short") {
+    for (const b of after) b.work.forEach((w, j) => { if (j > b.work.findIndex((x) => !x.done && !x.skipped)) skip(w, "short version (call)"); });
+    a.spec.blocks.forEach((b) => { if (!["lift", "info"].includes(b.type) && !["nordic", "copenhagen"].includes(b.id) && a.spec.blocks.indexOf(b) > a.spec.blocks.indexOf(lifts.at(-1))) b.cut = true; });
+  } else if (k === "stop" || k === "rpe") {
+    for (const b of (k === "stop" ? lifts : after)) b.work.forEach((w) => skip(w, k === "stop" ? "stopped (call)" : "heavy day"));
+    a.spec.blocks.forEach((b) => { if (!["lift", "info"].includes(b.type) && a.spec.blocks.indexOf(b) > a.spec.blocks.indexOf(lifts.at(-1))) b.cut = true; });
+    a.cut = k;
+  }
+  a.cutAck = Date.now();
+  if (k !== "resume") a.note = [a.note, `Cut: ${CUT[k].title} (cut rules).`].filter(Boolean).join(" ");
+}
+
 export function viewSession() {
   const a = S.active, s = a.spec;
   const anyWork = s.blocks.some((b) => b.type === "lift" && b.work.some((w) => w.done));
@@ -45,7 +105,11 @@ export function viewSession() {
     html += `<div class="setsel">${[3, 4].map((n) => `<button class="seg ${a.setsChoice === n ? "on" : ""}" data-a="sets" data-n="${n}">${n} sets</button>`).join("")}
       <p class="muted">${esc(s.sets_rule || "")}</p></div>`;
   }
-  s.blocks.forEach((b, i) => { html += blockHTML(b, i); });
+  html += cutBanner(a);
+  if (a.cut) html += `<section class="card alert"><h2>${esc(CUT[a.cut].title)}</h2><p>${esc(CUT[a.cut].text)}</p>
+    <div class="toolrow"><button class="btn sm primary" data-a="cuthips">Save + start the hip routine</button>
+      <button class="btn sm ghost" data-a="finish">Save what I did</button></div></section>`;
+  s.blocks.forEach((b, i) => { html += b.cut ? `<p class="muted small">${esc(b.title || b.label)} — cut (short version).</p>` : blockHTML(b, i); });
   html += `<div class="finishbar"><button class="btn primary big" data-a="finish">Finish session</button></div></main>`;
   return html;
 }
@@ -444,6 +508,9 @@ Object.assign(A, {
   "t-go"() { T.adjust(-3600); },
   "t-stop"() { T.stop(true); },
   finish() { S.view = "finish"; render(); },
+  cutsheet() { sheet({ type: "cut" }); },
+  cutapply(d) { applyCut(S.active, d.k); sheet(null); save(); render(); },
+  async cuthips() { S.active.thenHips = true; await A.commit(); },
   back() { S.view = "session"; render(); },
   async commit() {
     const a = S.active;
@@ -459,11 +526,13 @@ Object.assign(A, {
       send({ op: "session_log", date: a.date, session: a.key, status: "done",
         at: `${String(st.getHours()).padStart(2, "0")}:${String(st.getMinutes()).padStart(2, "0")}` });
     }
+    const thenHips = a.thenHips;
     S.active = null; save();
     T.stop(false); T.keepAwake(false);
     S.view = null; S.tab = "train";
     S.syncMsg = "Saving…";
     render();
+    if (thenHips && (S.plan?.routines?.hips)) A.open({ k: "hips" });
     await flushAll();
   },
   discard() {

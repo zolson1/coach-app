@@ -196,8 +196,10 @@ export function startSession(spec, today, setsChoice) {
 }
 
 export function sessionStatus(active) {
+  if (active.cut) return "partial";                  // cut short on a busy shift (train.js cut rules)
   for (const b of active.spec.blocks) {
     if (b.type !== "lift") continue;
+    if (b.work.some((w) => w.skipped && /call|heavy day|stopped/.test(w.skipReason || ""))) return "partial";
     if (b.work.some((w) => !w.done && !w.skipped && !w.optional)) return "partial";
     if (b.calibrate?.kind === "no_tm" && !b.state.ladder.length) return "partial";
   }

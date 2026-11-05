@@ -90,7 +90,7 @@ SHEETS.matpick = (sh) => {
   const chosen = new Set(sh.chosen ?? (m.slots || []).map((s) => key(s.class)));
   return `<div class="sheet"><h3>Classes — ${esc(dayLabel(sh.date))}</h3>
     ${m.changed ? `<p class="adj">${esc(m.changed)}</p>` : ""}
-    <p class="muted small">${m.kind ? `The program has ${m.kind === "double" ? "a double (BJJ → Muay Thai)" : "one class"} that day. ` : "Not a mat day in the program. "}Tap the classes you'll go to.${m.window ? ` Your window: ${esc(hm(m.window[0]))}–${esc(hm(m.window[1]))}.` : ""}</p>
+    <p class="muted small">${m.kind ? `The program has ${m.kind === "double" ? "a double (BJJ → Muay Thai)" : m.kind === "spar" ? "sparring (randori → Muay Thai sparring)" : "one class"} that day. ` : "Not a mat day in the program. "}Tap the classes you'll go to.${m.window ? ` Your window: ${esc(hm(m.window[0]))}–${esc(hm(m.window[1]))}.` : ""}</p>
     ${opts.length ? opts.map((c) => {
       const on = chosen.has(key(c));
       const hard = c.level === "hard" ? " · hard" : c.level === "technical" ? " · technical" : "";

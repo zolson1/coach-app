@@ -32,7 +32,7 @@ function dayHTML(f, d) {
   const lv = d.level;
   const t = dayTotals(d);
   const live = d.when !== "future";
-  const sessions = [d.mat === "double" ? "BJJ + Muay Thai" : d.mat === "one" ? "One class" : null,
+  const sessions = [d.mat === "double" ? "BJJ + Muay Thai" : d.mat === "one" ? "One class" : d.mat === "spar" ? "Sparring" : null,
     ...(d.sessions || []).map((s) => SESSION_NAME[s] || s), ...(d.activities || []).map((a) => a.name)].filter(Boolean);
   let html = `<section class="card dayhead">
     <div class="lift-head"><h2>${esc(dayLabel(d.date))}</h2>${levelChip(lv.today, LEVEL_NAME[lv.today])}</div>

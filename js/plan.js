@@ -53,7 +53,7 @@ export function suggestionsCard() {
 // ------------------------------------------------------------ one day's plan
 // The training line for a day: class, sessions, activities, and what covers what.
 export function planLine(d) {
-  const bits = [d.mat === "double" ? MAT.double : d.mat === "one" ? MAT.one : null,
+  const bits = [d.mat === "double" ? MAT.double : d.mat === "one" ? MAT.one : d.mat === "spar" ? "Sparring" : null,
     ...(d.sessions || []).filter((s) => s !== "rest").map((s) => SESSION_NAME[s] || s),
     ...(d.activities || []).map((a) => `${a.name}${a.start ? ` ${a.start}` : ""}`)].filter(Boolean);
   return bits.join(" · ");

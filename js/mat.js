@@ -28,7 +28,7 @@ export function matCard(d) {
   const m = d?.mat_plan;
   if (!m) return "";
   if (m.skipped_by_rule) return `<section class="card"><h2>Mat</h2>${m.notes.map((n) => `<p class="adj">${esc(n)}</p>`).join("")}</section>`;
-  return `<section class="card"><div class="lift-head"><h2>${m.kind === "double" ? "Double mat" : "One class"}</h2>
+  return `<section class="card"><div class="lift-head"><h2>${m.kind === "double" ? "Double mat" : m.kind === "spar" ? "Sparring" : "One class"}</h2>
       <div class="btnpair"><button class="btn sm ghost" data-a="matpicksheet" data-date="${d.date}">Classes…</button><button class="btn sm" data-a="matview" data-date="${d.date}">Warm-ups</button></div></div>
     ${m.changed ? `<p class="adj">${esc(m.changed)}</p>` : ""}
     <div class="rows meal">${m.slots.map((s) => slotLine(d, s)).join("")}</div>
@@ -68,7 +68,7 @@ export function viewMat() {
       return `<div class="check ${on ? "done" : ""}"><button class="tick" data-a="mattick" data-date="${d.date}" data-id="${esc(id)}">${on ? "✓" : ""}</button><span>${esc(t)}</span></div>`;
     }).join("")}</div></section>`;
   };
-  let html = `${header(m.kind === "double" ? "Double mat" : "One class", dayLabel(d.date), back())}<main class="wrap">${flashHTML()}`;
+  let html = `${header(m.kind === "double" ? "Double mat" : m.kind === "spar" ? "Sparring" : "One class", dayLabel(d.date), back())}<main class="wrap">${flashHTML()}`;
   html += m.notes.map((n) => `<p class="adj">${esc(n)}</p>`).join("");
   for (const s of m.slots) {
     const e = d.mat_log?.[s.slot];
@@ -100,7 +100,7 @@ SHEETS.cls = (sh) => {
       ${s.pick ? "" : `<button class="btn big" data-a="classswap">Went to a different class…</button>`}
       <button class="btn big" data-a="classstatus" data-st="skipped">Skipped it</button>
       ${e ? `<button class="btn ghost" data-a="classstatus" data-st="clear">Clear</button>` : ""}</div>
-      ${["F3", "F4"].includes(level) && d.mat_plan.kind === "double" && othersSkipped ? `<p class="muted small">Skipping all of today's mat? The fuel follows the session — drop today to F2 in the Fuel tab.</p>` : ""}
+      ${["F3", "F4"].includes(level) && ["double", "spar"].includes(d.mat_plan.kind) && othersSkipped ? `<p class="muted small">Skipping all of today's mat? The fuel follows the session — drop today to F2 in the Fuel tab.</p>` : ""}
       <button class="btn ghost" data-a="closesheet">Close</button>`}</div>`;
 };
 

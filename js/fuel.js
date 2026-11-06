@@ -61,7 +61,14 @@ function dayHTML(f, d) {
 
   html += timelineCard(d, { title: d.when === "today" ? "Today's timeline" : "Day timeline — meals and training", open: d.when === "future" });
 
-  html += `<section class="card"><div class="lift-head"><h2>${esc(d.card.title)}</h2><span class="tm">${esc(d.card.totals)}</span></div>
+  // a row the coach folded (food next to food) isn't in the day's total unless he ate it anyway
+  const folded = d.card.rows.some((r) => r.folded && !d.log?.[r.slot]);
+  const head = !folded ? d.card.totals : (() => {
+    const s = { kcal: 0, protein: 0, carbs: 0, fat: 0 };
+    for (const r of d.card.rows) if (!r.session && r.kcal != null && !(r.folded && !d.log?.[r.slot])) for (const k in s) s[k] += Number(r[k]) || 0;
+    return `~${fmtNum(Math.round(s.kcal))} kcal · ${Math.round(s.protein)} g P · ${Math.round(s.carbs)} g C · ${Math.round(s.fat)} g F`;
+  })();
+  html += `<section class="card"><div class="lift-head"><h2>${esc(d.card.title)}</h2><span class="tm">${esc(head)}</span></div>
     <div class="rows meal">${d.card.rows.map((r) => rowHTML(d, r) + (r.larder_notes && !d.log?.[r.slot] ? r.larder_notes.map((n) => `<p class="adj small">${esc(n)}</p>`).join("") : "")).join("")}</div>
     ${(d.card.notes || []).length ? `<details class="cues" ${d.when === "today" ? "open" : ""}><summary>Notes for this day</summary><ul class="plain">${d.card.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul></details>` : ""}
   </section>`;

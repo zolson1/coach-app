@@ -14,7 +14,7 @@
 
 export const DEFAULT_RULES = {
   meal_gap: 180, meal_gap_min: 150, snack_gap: 90, lift_after_meal: 120, lift_after_snack: 45,
-  lift_ideal_after_meal: 150, lic_after_meal: 75, class_after_meal: 180, eat_after_session: 120,
+  lift_ideal_after_meal: 150, lic_after_meal: 75, class_after_meal: 180, meal_before_mat: 150, eat_after_session: 120,
   recovery_after_mat: 15, dinner_before_lights: 150, pre_sleep_before_lights: 60, train_before_lights: 180,
   train_before_work: 90, eat_before_work: 60, round: 15,
 };
@@ -174,6 +174,7 @@ function applyWork(items, day, tl, R) {
 // ------------------------------------------------------------------ re-time
 function retime(items, tl, ctx, R) {
   const now = ctx.now;
+  for (const it of items) if (it.fold && !it.status) it.status = "fold";   // folded on the server (food next to food)
   const lights = tl.lights;
   const work = tl.work;
   const eveningWork = work && !tl.station && work[0] > 720 ? work[0] : null;
@@ -204,7 +205,7 @@ function retime(items, tl, ctx, R) {
   };
   for (const it of future) {
     if (it.kind === "train" && (it.fixed || it.train === "mat")) {
-      if (it.train === "mat" && mealT() > it.t - R.class_after_meal && mealT() > it.t - 600) {
+      if (it.train === "mat" && mealT() > it.t - (R.meal_before_mat ?? 150) && mealT() > it.t - 600) {   // closer than the plan puts it
         it.notes = [...(it.notes || []), `A full meal ${it.t - mealT()} min before class — go easy early, and skip the top-up.`];
       }
       lastTrain = Math.max(lastTrain, it.end ?? it.t);

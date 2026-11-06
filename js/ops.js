@@ -327,7 +327,7 @@ const num = (x) => Number(x) || 0;
 export function dayTotals(d) {
   const out = { kcal: 0, protein: 0, carbs: 0, fat: 0, plan_kcal: 0, plan_protein: 0, logged: 0, rows: 0 };
   for (const r of d.card?.rows || []) {
-    if (r.session || r.kcal == null) continue;
+    if (r.session || r.kcal == null || (r.folded && !d.log?.[r.slot])) continue;
     out.rows++;
     out.plan_kcal += num(r.kcal);
     out.plan_protein += num(r.protein);
@@ -346,7 +346,7 @@ export function dayTotals(d) {
 export function livedTotals(d) {
   const out = { kcal: 0, protein: 0, changes: 0 };
   for (const r of d.card?.rows || []) {
-    if (r.session || r.kcal == null) continue;
+    if (r.session || r.kcal == null || (r.folded && !d.log?.[r.slot])) continue;
     const e = d.log?.[r.slot];
     if (e && e.status !== "eaten") out.changes++;
     const src = e?.status === "skipped" ? {} : e?.status === "swapped" && e.swap ? e.swap : r;

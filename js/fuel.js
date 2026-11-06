@@ -102,9 +102,10 @@ function rowHTML(d, r) {
   const who = r.company === "shared" ? " · for two" : r.company === "away" ? " · not from the freezer" : "";
   const macros = (r.kcal == null ? "" : swapped ? macroLine(e.swap) : macroLine(r)) + who;
   const what = swapped ? `${esc(e.swap.title || e.swap.what)} <s>${esc(r.what)}</s>`
+    : r.folded && !e ? `<s>${esc(r.what)}</s> <span class="muted small">— ${esc(r.folded)}</span>`
     : r.company === "away" && r.planned ? `${esc(r.what)} <s>${esc(r.planned)}</s>` : esc(r.what);
   return `<button class="row mealrow ${state || ""}" data-a="rowsheet" data-date="${d.date}" data-slot="${esc(r.slot)}">
-    <span class="k">${esc(r.time)}</span>
+    <span class="k">${esc(r.time)}${r.card_time && r.card_time !== r.time ? ` <s class="muted">${esc(r.card_time)}</s>` : ""}</span>
     <span class="load">${what}</span>
     <span class="plates">${esc(macros)}</span>
     <span class="chk ${state || ""}">${icon}</span></button>`;

@@ -186,3 +186,46 @@ test("an activity is a fixed block: the lift works around it, a late relief flag
   const skipped = liveDay({ ...d, session_log: { act_tennis: { status: "skipped" } } }, { now: T("13:00") });
   assert.equal(at(skipped, "act_tennis").status, "skipped");
 });
+
+// Friday sparring at F2 (Zach, 2026-11-06): the server fits the card around 13:00–15:00 — lunch
+// before it, the yogurt that would land on the recovery shake folded — and the app keeps it that way.
+function sparDay(over = {}) {
+  return {
+    date: "2026-11-06", log: {}, session_log: {}, mat_log: {}, off_card: [],
+    timeline: {
+      wake: T("07:00"), lights: T("20:00"), work: null, station: false, level: "F2",
+      targets: { kcal: 2900, protein: 230, carbs: 330, fat: 80 },
+      items: [
+        { id: "breakfast", slot: "breakfast", kind: "meal", t: T("07:00"), kcal: 680, protein: 48, carbs: 102, fat: 12, what: "oats" },
+        { id: "lunch", slot: "lunch", kind: "meal", t: T("10:30"), was: T("14:00"), moved_for_mat: true, kcal: 650, protein: 46, carbs: 60, fat: 22, what: "Salmon plate" },
+        { id: "mat_s0", session: "mat_s0", kind: "train", train: "mat", t: T("13:00"), end: T("14:00"), fixed: true, label: "Randori" },
+        { id: "during", slot: "during", kind: "during", t: T("13:00"), kcal: 180, protein: 0, carbs: 45, fat: 0, what: "1 mat bottle" },
+        { id: "mat_s1", session: "mat_s1", kind: "train", train: "mat", t: T("14:00"), end: T("15:00"), fixed: true, label: "Muay Thai sparring" },
+        { id: "snack", slot: "snack", kind: "snack", t: T("15:00"), fold: true, kcal: 286, protein: 20, carbs: 33, fat: 4, what: "yogurt + berries" },
+        { id: "recovery", slot: "recovery", kind: "snack", t: T("15:15"), kcal: 450, protein: 53, carbs: 50, fat: 5, what: "Recovery shake" },
+        { id: "dinner", slot: "dinner", kind: "meal", t: T("17:30"), kcal: 620, protein: 56, carbs: 60, fat: 18, what: "bowl" },
+        { id: "lights", kind: "sleep", t: T("20:00"), label: "Lights out" },
+      ],
+    },
+    ...over,
+  };
+}
+
+test("a snack the server folded stays folded, and the meal it moved before the mat stays put", () => {
+  const live = liveDay(sparDay(), { now: T("09:00") });
+  assert.equal(at(live, "snack").status, "fold");
+  assert.equal(at(live, "lunch").at, "10:30");
+  assert.ok(!(at(live, "mat_s0").notes || []).some((n) => /full meal/.test(n)));   // 2½ h out is the plan, not a warning
+  assert.equal(at(live, "recovery").at, "15:15");
+  assert.equal(live.balance.projected.kcal, 680 + 650 + 180 + 450 + 620);          // the folded yogurt isn't counted
+});
+
+test("eating the folded snack anyway counts it", () => {
+  const live = liveDay(sparDay({ log: { snack: { status: "eaten", ate_at: "15:30" } } }), { now: T("16:00") });
+  assert.notEqual(at(live, "snack").status, "fold");
+});
+
+test("lunch eaten an hour before the mat still gets the go-easy note", () => {
+  const live = liveDay(sparDay({ log: { lunch: { status: "eaten", ate_at: "12:00" } } }), { now: T("12:15") });
+  assert.ok((at(live, "mat_s0").notes || []).some((n) => /full meal 60 min before class/.test(n)));
+});

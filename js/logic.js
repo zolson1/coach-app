@@ -8,7 +8,7 @@ export const r5 = (x) => Math.floor(x / 5 + 0.5) * 5;
 
 export function barWeight(implement, settings) {
   if (implement === "trap_bar") return Number(settings.trapBar) || 45;
-  if (implement === "pullup") return 0;
+  if (implement === "pullup" || implement === "landmine") return 0;   // landmine: plates on the end only
   return Number(settings.barbell) || 45;
 }
 
@@ -28,6 +28,12 @@ export function plates(total, bar, available = DEFAULT_PLATES) {
 
 export function platesText(total, implement, settings) {
   if (implement === "pullup") return total > 0 ? `+${total} on the belt` : "bodyweight";
+  if (implement === "landmine") {
+    if (!(total > 0)) return "empty bar";
+    const { perSide, remainder } = plates(total * 2, 0, settings.plates || DEFAULT_PLATES);
+    const txt = perSide.join(" + ") + " on the end";
+    return remainder ? `${txt} (${remainder / 2} lb short)` : txt;
+  }
   const bar = barWeight(implement, settings);
   if (total <= bar) return "empty bar";
   const { perSide, remainder } = plates(total, bar, settings.plates || DEFAULT_PLATES);

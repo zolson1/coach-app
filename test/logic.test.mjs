@@ -115,3 +115,9 @@ test("light work offers a TM check on a 7.5/8 week — never on the 75% week, ne
   assert.equal(L.lightCheck(lift(7.5, [4, 6, 4]), pol), false);
   assert.equal(L.lightCheck({ ...lift(8, [4, 4]), calibrate: { kind: "provisional" } }, pol), false);
 });
+
+test("landmine: load is plates on the end, the bar isn't counted", () => {
+  assert.equal(L.barWeight("landmine", {}), 0);
+  assert.equal(L.platesText(70, "landmine", {}), "45 + 25 on the end");
+  assert.equal(L.platesText(0, "landmine", {}), "empty bar");
+});

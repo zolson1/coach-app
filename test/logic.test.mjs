@@ -121,3 +121,9 @@ test("landmine: load is plates on the end, the bar isn't counted", () => {
   assert.equal(L.platesText(70, "landmine", {}), "45 + 25 on the end");
   assert.equal(L.platesText(0, "landmine", {}), "empty bar");
 });
+
+test("safety squat bar: its own bar weight, 65 lb until set", () => {
+  assert.equal(L.barWeight("ssb", {}), 65);
+  assert.equal(L.platesText(245, "ssb", { ssb: 65, plates: L.DEFAULT_PLATES }), "45 + 45 / side");
+  assert.equal(L.platesText(245, "ssb", { plates: L.DEFAULT_PLATES }), "45 + 45 / side");
+});

@@ -28,6 +28,7 @@ export const DEFAULT_SETTINGS = {
   branch: "main",
   barbell: 45,
   trapBar: 45,
+  ssb: 65,
   plates: [45, 35, 25, 10, 5, 2.5],
   sound: true,
   vibrate: true,

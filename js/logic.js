@@ -8,6 +8,7 @@ export const r5 = (x) => Math.floor(x / 5 + 0.5) * 5;
 
 export function barWeight(implement, settings) {
   if (implement === "trap_bar") return Number(settings.trapBar) || 45;
+  if (implement === "ssb") return Number(settings.ssb) || 65;          // safety squat bars run ~60–70
   if (implement === "pullup" || implement === "landmine") return 0;   // landmine: plates on the end only
   return Number(settings.barbell) || 45;
 }

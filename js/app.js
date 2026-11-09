@@ -98,6 +98,7 @@ function viewSettings() {
     <label class="fld">Repository<input id="set-repo" value="${esc(s.repo)}"></label>
     <label class="fld">Barbell weight (lb)<input type="number" inputmode="decimal" id="set-barbell" value="${esc(s.barbell)}"></label>
     <label class="fld">Trap bar weight (lb) — check the bar; many are 55–65<input type="number" inputmode="decimal" id="set-trap" value="${esc(s.trapBar)}"></label>
+    <label class="fld">Safety squat bar weight (lb) — most are 60–70<input type="number" inputmode="decimal" id="set-ssb" value="${esc(s.ssb ?? 65)}"></label>
     <fieldset class="fld"><legend>Plates available</legend>${L.DEFAULT_PLATES.map((p) =>
       `<label class="chip"><input type="checkbox" class="set-plate" value="${p}" ${s.plates.includes(p) ? "checked" : ""}> ${p}</label>`).join("")}</fieldset>
     <label class="chip"><input type="checkbox" id="set-sound" ${s.sound ? "checked" : ""}> Timer beeps</label>
@@ -142,6 +143,7 @@ Object.assign(A, {
     const g = (id) => document.getElementById(id);
     S.settings = { ...S.settings, token: g("set-token").value.trim(), repo: g("set-repo").value.trim(),
       barbell: Number(g("set-barbell").value) || 45, trapBar: Number(g("set-trap").value) || 45,
+      ssb: Number(g("set-ssb").value) || 65,
       plates: [...document.querySelectorAll(".set-plate")].filter((x) => x.checked).map((x) => Number(x.value)),
       sound: g("set-sound").checked, vibrate: g("set-vib").checked, background: g("set-bg").checked };
     store.saveSettings(DEV ? { ...S.settings, token: "" } : S.settings);

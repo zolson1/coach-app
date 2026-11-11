@@ -1,6 +1,6 @@
 // The Kitchen tab: batch counts and where they run out, tonight's prep, cook
 // days as a guided run, shopping lists, the pantry of extras, recipes, and the
-// cycle menu (research a new one, import one, review a draft, switch).
+// menu (its recipes, cook days and station kit).
 import { S, A, SHEETS, esc, fuel, send, sheet, render, renderSheet, today, ask, requests, store, fmtNum, uid, go,
   header, flash, flashHTML, gh, L, T } from "./core.js";
 import { dayOf, dayLabel, tasksHTML, macroLine, emptyState } from "./ui.js";
@@ -210,16 +210,10 @@ SHEETS.pantry = (sh) => {
 
 // -------------------------------------------------------------------- menu
 function menu(f) {
-  const m = f.menu, cat = f.menus;
-  const open = requests().filter((q) => ["new_menu", "import_menu"].includes(q.body.kind) && ["queued", "sent"].includes(q.state));
-  return `<section class="card"><div class="lift-head"><h2>${esc(m.name)}</h2><span class="tm">this cycle's menu</span></div>
-      ${cat.pending ? `<p class="adj">Switching to ${esc(cat.pending)} — takes about a minute.</p>` : ""}
+  const m = f.menu;
+  return `<section class="card"><div class="lift-head"><h2>${esc(m.name)}</h2><span class="tm">the menu</span></div>
       <p class="muted small">${esc(m.summary || m.source || "")}</p>
-      <button class="btn" data-a="cycle">Bored of it? Build a new cycle${open.length ? " · working…" : ""}</button>
-      ${cat.drafts.length ? `<h3 class="sub">Drafts waiting for you</h3>${cat.drafts.map((x) =>
-        `<button class="session" data-a="draft" data-id="${esc(x.id)}"><span class="s-title">${esc(x.name || x.id)}</span><span class="s-sub">${esc(x.summary || "")}</span><span class="s-when">${esc(x.source || "")}</span></button>`).join("")}` : ""}
-      ${cat.available.filter((x) => x.id !== cat.active).length ? `<h3 class="sub">Other menus</h3>${cat.available.filter((x) => x.id !== cat.active).map((x) =>
-        `<button class="session" data-a="switchmenu" data-id="${esc(x.id)}"><span class="s-title">${esc(x.name || x.id)}</span><span class="s-when">Switch back to this one</span></button>`).join("")}` : ""}
+      <p class="muted small">Want different food at the same numbers? Tell the coach — a new menu is a few minutes' work for it, not a screen here.</p>
     </section>
     <section class="card"><h2>Recipes</h2>${Object.entries(m.recipes).map(([k, r]) =>
       `<button class="session" data-a="recipe" data-k="${esc(k)}"><span class="s-title">${esc(r.title)}</span>
@@ -233,7 +227,7 @@ function menu(f) {
 
 export function viewRecipe() {
   const f = fuel();
-  const r = (S.draft?.recipes || f.menu.recipes)[S.viewArg] || f.menu.recipes[S.viewArg];
+  const r = f.menu.recipes[S.viewArg];
   if (!r) return header("Recipe", "", back()) + `<main class="wrap"><p class="muted">Not found.</p></main>`;
   return `${header(r.title, `makes ${r.yield} · ${r.serving || ""}`, back())}
   <main class="wrap"><section class="card"><p class="big-num">${esc(macroLine(r.macros))}</p>
@@ -304,66 +298,6 @@ function packVals(st, p) {
   return { duo: typed.duo ?? p.duo, single: typed.single ?? p.singles };
 }
 
-// ------------------------------------------------------------ a new cycle
-export function viewCycle() {
-  const f = fuel();
-  const prefs = store.get("cycleprefs") || "";
-  const usePantry = store.get("cyclepantry") ?? true;
-  const reqs = requests().filter((q) => ["new_menu", "import_menu"].includes(q.body.kind)).slice(-4).reverse();
-  return `${header("A new cycle", "same numbers, different food", back())}
-  <main class="wrap">${flashHTML()}
-    <section class="card"><p>A new menu changes what the cards are made of — the recipes, the batches, the haul. Your fuel levels, meal times and cook days stay exactly as they are.</p>
-      <label class="fld">What do you want from it?<textarea id="cyprefs" rows="4" data-a="cyprefs" placeholder="Bored of chili. More Korean and Mexican. Keep the overnight oats. Something I can grill.">${esc(prefs)}</textarea></label>
-      <label class="chip wide"><input type="checkbox" data-a="cypantry" ${usePantry ? "checked" : ""}> Work in my pantry extras (${f.pantry.length})</label>
-    </section>
-    <section class="card"><h2>Let the coach research it</h2>
-      <p class="muted small">Runs on GitHub with web search: 15–20 minutes and a few dollars of API credit. You get a draft to review — nothing changes until you activate it.</p>
-      <button class="btn primary big" data-a="cyresearch">Research a new menu</button></section>
-    <section class="card"><h2>Or use Claude's Research yourself</h2>
-      <p class="muted small">Copy the brief, run it in Claude with Research on, then paste the whole answer back here.</p>
-      <button class="btn" data-a="cycopy">Copy the brief</button>
-      <label class="fld">Paste the finished plan<textarea id="cypaste" rows="5" placeholder="Paste the full write-up here"></textarea></label>
-      <button class="btn" data-a="cyimport">Import it</button></section>
-    ${reqs.length ? `<section class="card"><h2>Recent requests</h2>${reqs.map((q) => {
-      const kind = q.body.kind === "new_menu" ? "Research" : "Import";
-      const t = new Date(q.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-      if (q.state === "done") { const r = q.response.result; return `<button class="session hero" data-a="draft" data-id="${esc(r.menu_id)}">
-        <span class="s-title">${esc(r.name)} — draft ready</span><span class="s-sub">${esc(r.summary || "")}</span>
-        <span class="s-when">${kind} · ${esc(t)}${r.problems?.length ? ` · ${r.problems.length} check(s) to look at` : ""}</span></button>`; }
-      if (q.state === "error") return `<p class="warn-text">${kind} at ${esc(t)} failed: ${esc(q.response?.error || "unknown")}</p>`;
-      return `<p class="line">${kind} started ${esc(t)} — working. ${q.body.kind === "new_menu" ? "Give it 15–20 minutes; you can leave this screen." : "A few minutes."}</p>`;
-    }).join("")}</section>` : ""}
-  </main>`;
-}
-
-const pantryText = (f) => f.pantry.map((p) => `${p.name}${p.qty ? ` — ${p.qty} ${p.unit || ""}`.trimEnd() : ""}${p.where ? ` (${p.where})` : ""}`).join("\n");
-
-export function viewDraft() {
-  const id = S.viewArg;
-  const m = S.draft?.id === id ? S.draft : null;
-  if (!m) return `${header("Draft menu", "", back())}<main class="wrap">${flashHTML()}<p class="muted">Loading the draft…</p></main>`;
-  const f = fuel();
-  const req = requests().find((q) => q.response?.result?.menu_id === id);
-  const problems = req?.response?.result?.problems || [];
-  const isDraft = (f.menus.drafts || []).some((x) => x.id === id) || !(f.menus.available || []).some((x) => x.id === id);
-  return `${header(m.name, "draft — nothing changes until you activate it", back())}
-  <main class="wrap">${flashHTML()}
-    <section class="card"><p>${esc(m.summary || "")}</p><p class="muted small">${esc(m.source || "")}</p>
-      ${problems.length ? `<div class="adj">Checks that didn't pass — it can't be activated as is:<ul class="plain">${problems.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
-      <button class="btn" data-a="draftwriteup" data-id="${esc(id)}">Read the full write-up</button>
-      ${S.draftText ? `<div class="writeup">${esc(S.draftText)}</div>` : ""}</section>
-    ${Object.entries(m.cards).map(([k, c]) => `<section class="card"><div class="lift-head"><h2>${esc(c.title || k)}</h2><span class="tm">${esc(c.totals || "")}</span></div>
-      <div class="rows meal">${c.rows.map((r) => `<div class="row mealrow"><span class="k">${esc(r.time)}</span><span class="load">${esc(r.what)}</span><span class="plates">${esc(macroLine(r))}</span></div>`).join("")}</div></section>`).join("")}
-    <section class="card"><h2>Recipes</h2>${Object.entries(m.recipes).map(([k, r]) => `<details class="cues"><summary>${esc(r.title)} — makes ${esc(r.yield)}</summary>
-      <p class="muted small">${esc(macroLine(r.macros))}</p><ul class="plain">${r.ingredients.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
-      <ol class="plain">${r.steps.map((x) => `<li>${esc(x)}</li>`).join("")}</ol></details>`).join("")}</section>
-    <section class="card"><h2>The haul</h2><p class="muted">About $${fmtNum(Math.round(m.haul.reduce((a, h) => a + (h.est || 0), 0)))} per loop.</p>
-      <ul class="plain">${m.haul.map((h) => `<li>${esc(h.item)} <span class="muted">· ${esc(h.qty)} · ${esc(h.where)}</span></li>`).join("")}</ul></section>
-    ${isDraft && !problems.length ? `<div class="finishbar"><button class="btn primary big" data-a="activate" data-id="${esc(id)}">Activate this menu</button>
-      <p class="muted small">New batches start at zero — do a cook day, then set the counts. You can switch back any time from Kitchen → Menu.</p></div>` : ""}
-  </main>`;
-}
-
 // ------------------------------------------------------------------ actions
 const val = (id) => document.getElementById(id)?.value?.trim() ?? "";
 
@@ -429,7 +363,6 @@ Object.assign(A, {
   },
   pantrydel(d) { send({ op: "pantry_remove", id: d.id }); },
   recipe(d) { sheet(null); go("recipe", d.k); },
-  cycle() { go("cycle"); },
   cookstart() {
     const prev = store.get("cook")?.key === S.viewArg ? store.get("cook") : {};
     store.set("cook", { ...prev, key: S.viewArg, started: Date.now(), done: [] });
@@ -460,46 +393,6 @@ Object.assign(A, {
     S.view = null; S.tab = "kitchen"; S.kitchenTab = "stock";
     send(ops);
   },
-  cyresearch() {
-    const f = fuel();
-    if (!confirm("Start the research? It takes 15–20 minutes and costs a few dollars of API credit.")) return;
-    ask({ kind: "new_menu", preferences: val("cyprefs"), pantry: store.get("cyclepantry") ?? true ? pantryText(f) : "" });
-    flash("Research started. The draft shows up here when it's done.");
-  },
-  async cycopy() {
-    const f = fuel();
-    const text = f.research.prompt.replace("{{PREFERENCES}}", val("cyprefs") || "(no specific requests — vary the cuisines and proteins from the current menu)")
-      .replace("{{PANTRY}}", (store.get("cyclepantry") ?? true) && f.pantry.length ? pantryText(f) : "(nothing listed)");
-    try { await navigator.clipboard.writeText(text); flash("Brief copied — paste it into Claude with Research on."); }
-    catch { sheet({ type: "text", title: "Copy this brief", text }); }
-  },
-  cyimport() {
-    const text = val("cypaste");
-    if (text.length < 800) { flash("That's too short to be a full plan — paste the whole answer.", "warn"); return; }
-    ask({ kind: "import_menu", writeup: text });
-    flash("Importing — the draft shows up here in a few minutes.");
-  },
-  async draft(d) {
-    S.draft = null; S.draftText = null;
-    go("draft", d.id);
-    try {
-      const m = (await gh.getJSON(S.settings, `menus/drafts/${d.id}.json`)) || (await gh.getJSON(S.settings, `menus/${d.id}.json`));
-      if (!m) throw new Error("the draft file isn't there yet — try again in a minute");
-      S.draft = m;
-    } catch (e) { flash(e.message, "warn"); }
-    render();
-  },
-  async draftwriteup(d) {
-    try { S.draftText = (await gh.getText(S.settings, `menus/drafts/${d.id}.md`)) || (await gh.getText(S.settings, `menus/${d.id}.md`)) || "No write-up was saved with this menu."; }
-    catch (e) { S.draftText = e.message; }
-    render();
-  },
-  activate(d) {
-    if (!confirm("Switch to this menu? The cards change from tomorrow morning's run; new batches start at zero.")) return;
-    S.view = null; S.tab = "kitchen"; S.kitchenTab = "menu";
-    send({ op: "set_menu", id: d.id, date: today() });
-  },
-  switchmenu(d) { if (confirm("Switch back to this menu?")) send({ op: "set_menu", id: d.id, date: today() }); },
 });
 
 SHEETS.text = (sh) => `<div class="sheet"><h3>${esc(sh.title)}</h3><textarea rows="12" readonly>${esc(sh.text)}</textarea>
@@ -512,8 +405,6 @@ export const kitchenInputs = {
     packs[el.dataset.k] = { ...(packs[el.dataset.k] || {}), [el.dataset.f]: Math.max(0, Number(el.value) || 0) };
     store.set("cook", { ...st, packs });
   },
-  cyprefs(el) { store.set("cycleprefs", el.value); },
-  cypantry(el) { store.set("cyclepantry", el.checked); },
   cookalt(el) {
     const st = store.get("cook")?.key === S.viewArg ? store.get("cook") : { key: S.viewArg, started: null, done: [] };
     store.set("cook", { ...st, alt: el.checked });

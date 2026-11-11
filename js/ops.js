@@ -187,7 +187,6 @@ export function applyOps(f, ops, ctx = {}) {
         f.carb_adjust_pending = true;
         break;
       case "set_menu":
-        f.menus.pending = o.id;
         break;
       case "mat_log": {
         const d = day(o.date);

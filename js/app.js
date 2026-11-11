@@ -4,7 +4,7 @@ import { S, A, INPUTS, esc, root, overlay, bar, tabbar, store, T, L, gh, today, 
   setRenderer, renderSheet, refreshPlan, flushAll, pollRequests, pendingCount, queue, fuel, DEV } from "./core.js";
 import { viewTrain, viewSession, viewFinish, renderTimer } from "./train.js";
 import { viewFuel } from "./fuel.js";
-import { viewKitchen, viewCook, viewRecipe, viewCycle, viewDraft, kitchenInputs } from "./kitchen.js";
+import { viewKitchen, viewCook, viewRecipe, kitchenInputs } from "./kitchen.js";
 import { viewProgress } from "./progress.js";
 import { viewToday } from "./today.js";
 import { wireCharts } from "./charts.js";
@@ -18,7 +18,7 @@ import "./plan.js";
 
 const TABS = [["today", "Today", "☀"], ["train", "Train", "🏋"], ["fuel", "Fuel", "🍽"], ["kitchen", "Kitchen", "🧊"], ["progress", "Progress", "📈"]];
 const TAB_VIEW = { today: viewToday, train: viewTrain, fuel: viewFuel, kitchen: viewKitchen, progress: viewProgress };
-const OVER = { session: viewSession, finish: viewFinish, settings: viewSettings, cook: viewCook, recipe: viewRecipe, cycle: viewCycle, draft: viewDraft, mat: viewMat, week: viewWeek };
+const OVER = { session: viewSession, finish: viewFinish, settings: viewSettings, cook: viewCook, recipe: viewRecipe, mat: viewMat, week: viewWeek };
 Object.assign(INPUTS, kitchenInputs);
 
 function banners() {
@@ -112,7 +112,7 @@ function viewSettings() {
       <p class="muted small">What your phone's notifications will say (set up in MacroDroid).</p>
       <p class="line"><b>Morning:</b> ${esc(rem.morning || "nothing today")}</p>
       <p class="line"><b>Evening:</b> ${esc(rem.evening || "nothing tonight")}</p></section>` : ""}
-    <p class="muted small center">Plan built ${esc(S.plan?.generated || "—")} · menu ${esc(fuel()?.menu?.id || "—")}</p></main>`;
+    <p class="muted small center">Plan built ${esc(S.plan?.generated || "—")}</p></main>`;
 }
 
 Object.assign(A, {
@@ -122,9 +122,7 @@ Object.assign(A, {
   tab(d) { S.tab = d.t; S.view = null; store.set("tab", d.t); if (d.t !== "fuel") S.fuelDate = null; render(); window.scrollTo(0, 0); },
   settings() { S.view = "settings"; render(); window.scrollTo(0, 0); },
   closeview() {
-    const was = S.view;
-    S.view = was === "recipe" && S.draft && S.viewArg && S.draft.recipes?.[S.viewArg] ? "draft" : null;
-    if (was === "draft") { S.view = "cycle"; }
+    S.view = null;
     render();
   },
   async dispatch() {

@@ -65,8 +65,10 @@ export function viewToday() {
           ${dinner ? companyControl(d, dinner, dinnerAt) + companyDetail(dinner) : ""}</section>`;
       } else {
         const row = d.card.rows.find((r) => r.slot === i.slot) || {};
+        const guide = row.guide && row.build;        // guide mode: the target is the headline, the meal an example
         html += `<section class="card next"><span class="eyebrow">Next · ${esc(i.at)}${i.moved ? ` <s>${esc(row.time || "")}</s>` : ""}</span>
-          <h2>${esc(i.label || i.what)}</h2><p class="muted">${esc(macroLine(i.eff ? { ...i.eff, kcal: Math.round(i.eff.kcal) } : i))}</p>
+          <h2>${esc(guide ? row.build.charAt(0).toUpperCase() + row.build.slice(1) : i.label || i.what)}</h2>
+          ${guide ? `<p class="muted small">e.g. ${esc(row.what)}</p>` : ""}<p class="muted">${esc(macroLine(i.eff ? { ...i.eff, kcal: Math.round(i.eff.kcal) } : i))}</p>
           ${notes.map((n) => `<p class="adj">${esc(n)}</p>`).join("")}${companyDetail(row)}
           <div class="two"><button class="btn" data-a="devsheet" data-date="${d.date}" data-slot="${esc(i.slot)}">Ate something else</button>
             <button class="btn ghost" data-a="rowsheet" data-date="${d.date}" data-slot="${esc(i.slot)}">Different time / skipped</button></div>

@@ -39,6 +39,7 @@ function dayHTML(f, d) {
     <p class="big-num">${fmtNum(lv.kcal)} <span>kcal</span> · ${lv.protein}+ <span>g protein</span> · ${esc(String(lv.carbs).replace("~", ""))} <span>carbs</span></p>
     <p class="muted">${esc(statusLine(d))}${sessions.length ? ` — ${esc(sessions.join(" · "))}` : ""}</p>
     ${(lv.why || []).map((w) => `<p class="adj">${esc(w)}</p>`).join("")}
+    ${f.mode === "guide" ? `<p class="adj">Guide mode — your own food, to these numbers. Each row is a target; the meal after it is only an example.</p>` : ""}
     ${lv.pending ? `<p class="adj">Changing to ${esc(lv.pending)} — the card updates in about a minute.</p>` : ""}
     ${d.leave ? `<p class="adj">Leave: ${esc({ full: "the whole shift", first12: "first 12 h — working the night half", last12: "last 12 h — working the day half" }[d.leave.part])}</p>` : ""}
     ${d.leave_pending ? `<p class="muted small">Leave saved — the plan rebuilds in about a minute.</p>` : ""}
@@ -93,12 +94,16 @@ function dayHTML(f, d) {
   html += `<div class="toolrow">
     ${d.when === "today" ? `<button class="btn sm" data-a="levelsheet">Change today's level</button>` : ""}
     <button class="btn sm" data-a="eatout" data-date="${d.date}">Eating out</button>
+    <button class="btn sm" data-a="foodmodesheet">${f.mode === "guide" ? "Guide mode" : "Food mode"}…</button>
     <button class="btn sm" data-a="companysheet">Eating with her</button>
     <button class="btn sm" data-a="asksheet">Ask the coach</button>
     <button class="btn sm" data-a="sweatsheet">Sweat test</button>
   </div>`;
   return html;
 }
+
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+export const guideMode = () => fuel()?.mode === "guide";
 
 function rowHTML(d, r) {
   if (r.session) return `<div class="row session-row"><span class="k">${esc(r.time)}</span><span class="load">${esc(r.what)}</span></div>`;
@@ -110,7 +115,8 @@ function rowHTML(d, r) {
   const macros = (r.kcal == null ? "" : swapped ? macroLine(e.swap) : macroLine(r)) + who;
   const what = swapped ? `${esc(e.swap.title || e.swap.what)} <s>${esc(r.what)}</s>`
     : r.folded && !e ? `<s>${esc(r.what)}</s> <span class="muted small">— ${esc(r.folded)}</span>`
-    : r.company === "away" && r.planned ? `${esc(r.what)} <s>${esc(r.planned)}</s>` : esc(r.what);
+    : r.company === "away" && r.planned ? `${esc(r.what)} <s>${esc(r.planned)}</s>`
+    : r.guide && r.build ? `${esc(cap(r.build))} <span class="muted small">— e.g. ${esc(r.what)}</span>` : esc(r.what);
   return `<button class="row mealrow ${state || ""}" data-a="rowsheet" data-date="${d.date}" data-slot="${esc(r.slot)}">
     <span class="k">${esc(r.time)}${r.card_time && r.card_time !== r.time ? ` <s class="muted">${esc(r.card_time)}</s>` : ""}</span>
     <span class="load">${what}</span>
@@ -200,6 +206,18 @@ SHEETS.offcard = (sh) => `<div class="sheet"><h3>Off the card — ${esc(dayLabel
   <p class="muted small">Leave the calories blank and the review assumes about 500 for a meal and 130 a drink.</p>
   <div class="sheet-foot"><button class="btn ghost" data-a="closesheet">Cancel</button>
     <button class="btn primary" data-a="saveoffcard">Log it</button></div></div>`;
+
+// cards = eating the menu's own meals (batches counted, thawed, shopped for) · guide = his own food
+// to the cards' numbers (coach/fuel.py § food mode). A logged cook day or haul returns to cards.
+SHEETS.foodmode = () => {
+  const guide = guideMode();
+  const opt = (m, title, text) => `<button class="option ${guide === (m === "guide") ? "on" : ""}" data-a="foodmode" data-m="${m}">
+    <b>${esc(title)}${guide === (m === "guide") ? " ✓" : ""}</b><span class="muted">${esc(text)}</span></button>`;
+  return `<div class="sheet"><h3>How you're eating</h3>
+    ${opt("guide", "Guide — my own food, the plan's numbers", "Each meal shows as a protein / carb target with the card's meal as an example. Nothing in the kitchen is counted, and the thaw, cook-day and running-short reminders stop.")}
+    ${opt("cards", "Cards — the plan's meals", "The batch recipes as written. The app counts the freezer down, tells you what to thaw and when you'll run out. Logging a cook day or a haul switches to this by itself.")}
+    <button class="btn ghost" data-a="closesheet">Close</button></div>`;
+};
 
 SHEETS.level = () => {
   const f = fuel();
@@ -321,6 +339,8 @@ Object.assign(A, {
   },
   offdel(d) { send({ op: "off_card_remove", id: d.id }); },
   levelsheet() { sheet({ type: "level" }); },
+  foodmodesheet() { sheet({ type: "foodmode" }); },
+  foodmode(d) { if ((d.m === "guide") !== guideMode()) send({ op: "food_mode", mode: d.m }); S.sheet = null; render(); },
   setlevel(d) {
     const why = val("lvlwhy");
     sheet(null);

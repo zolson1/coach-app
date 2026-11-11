@@ -25,6 +25,16 @@ function stock(f) {
   const k = f.kitchen;
   const d = dayOf(today());
   let html = "";
+  if (f.mode === "guide") {
+    const n = k.next;
+    return `<section class="card"><h2>Guide mode</h2>
+      <p>You're eating your own food to the plan's numbers, so nothing here is being counted — no thaw list, no running-short warnings.</p>
+      <p class="muted">Back on the batch recipes? Log the cook day or the haul and the kitchen picks up again from there.</p>
+      ${n.cook ? `<p class="line">The loop's next cook day is <b>${esc(when(n.cook.date))}</b> (${esc(n.cook.title || "cook day")}).</p>
+        <button class="btn" data-a="startcook" data-k="${esc(n.cook.key)}">Open ${esc(n.cook.title || "cook day")}</button>` : ""}
+      <div class="toolrow"><button class="btn sm" data-a="foodmodesheet">Change food mode…</button>
+        <button class="btn sm ghost" data-a="ktab" data-k="shop">What a cook day needs</button></div></section>`;
+  }
   if (k.short.length) {
     html += `<section class="card alert"><h2>Running short</h2>${k.short.map((s) =>
       `<p class="line"><b>${esc(s.label)}</b> run${s.label.endsWith("s") ? "" : "s"} out ${esc(when(s.runs_out))} — before the next ${esc(s.refill_kind)}${s.refill ? ` (${esc(when(s.refill))})` : ""}.</p>`).join("")}

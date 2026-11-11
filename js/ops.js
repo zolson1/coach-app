@@ -313,6 +313,19 @@ export function applyOps(f, ops, ctx = {}) {
       case "sweat_test":
         f.sweat_tests = [...(f.sweat_tests || []), sweat({ ...o, date })];
         break;
+      case "food_mode": {             // guide = his own food to the cards' numbers; the kitchen goes quiet now
+        f.mode = o.mode === "guide" ? "guide" : "cards";
+        const guide = f.mode === "guide";
+        for (const d of f.days) {
+          if (d.when === "past") continue;
+          for (const r of d.card.rows) if (r.kcal != null && !r.session && r.where !== "station") r.guide = guide;
+          if (guide) d.tasks = (d.tasks || []).filter((t) => ["kit", "early"].includes(t.id));
+        }
+        if (guide) { f.kitchen.short = []; f.kitchen.low = []; }
+        f.kitchen.mode = f.mode;
+        f.kitchen.guide_offer = false;
+        break;
+      }
       default:
         break;
     }

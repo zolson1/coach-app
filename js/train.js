@@ -174,6 +174,7 @@ function liftHTML(b, i) {
   return `<section class="card lift" id="blk${i}">
     <div class="lift-head"><h2>${esc(b.label)}</h2>
       <span class="tm">${b.tm ? `TM ${esc(b.tm)}${b.load_mode === "added" ? " total" : ""}` : "No TM"}${b.load_mode === "added" && b.bodyweight ? ` · BW ${esc(b.bodyweight)}` : ""}${b.provisional ? ` <i class="badge">provisional</i>` : ""}${b.pct ? ` · ${Math.round(b.pct * 100)}%${b.pct_basis ? ` ${esc(b.pct_basis)}` : ""}` : ""}${b.speed_rule ? " · speed governs" : ` · cap RPE ${esc(b.rpe_cap)}`}${b.rest_label ? ` · rest ${esc(b.rest_label)}` : ""}</span></div>
+    ${b.note ? `<p class="adj">${esc(b.note)}</p>` : ""}
     ${hist ? `<p class="hist">Last ${esc(hist)}</p>` : ""}
     ${note ? `<p class="hist note">Note (${esc(L.fmtDate(note.date))}): ${esc(note.text)}</p>` : ""}
     ${cuesHTML(b)}
@@ -219,6 +220,7 @@ function holdHTML(b, i) {
   const loadField = b.track && b.track.endsWith("_lb") || b.load != null || b.load_note
     ? `<label class="inl">Load <input class="num" type="number" inputmode="decimal" data-a="holdload" data-b="${i}" value="${esc(st.load ?? "")}" placeholder="lb"> lb</label>` : "";
   return `<section class="card hold"><div class="lift-head"><h2>${esc(b.title)}</h2><span class="tm">${b.sides ? `${esc(b.sets / 2)} × ${esc(target)}/side` : `${esc(b.sets)} × ${esc(target)}`}${b.load_label ? ` · ${esc(b.load_label)}` : ""}</span></div>
+    ${b.note ? `<p class="adj">${esc(b.note)}</p>` : ""}
     ${b.load_note ? `<p class="muted">${esc(b.load_note)}</p>` : ""}${loadField}
     ${cuesHTML(b)}
     <div class="rows">${st.secs.map((x, j) => `<div class="row ${x != null ? "done" : ""}"><span class="k">${b.sides ? `${j % 2 ? "R" : "L"}${Math.floor(j / 2) + 1}` : j + 1}</span>
@@ -231,6 +233,7 @@ function setsHTML(b, i) {
   const st = b.state;
   const loadField = b.track ? `<label class="inl">Load <input class="num" type="number" inputmode="decimal" data-a="setsload" data-b="${i}" value="${esc(st.load ?? "")}" placeholder="lb"> lb</label>` : "";
   return `<section class="card sets"><div class="lift-head"><h2>${esc(b.title)}</h2><span class="tm">${esc(b.sets)} × ${esc(b.reps_label)}${b.load_label ? ` · ${esc(b.load_label)}` : ""}</span></div>
+    ${b.note ? `<p class="adj">${esc(b.note)}</p>` : ""}
     ${loadField}${cuesHTML(b)}
     <div class="dots">${st.done.map((d, j) => `<button class="dot ${d ? "on" : ""}" data-a="setdone" data-b="${i}" data-s="${j}">${d ? "✓" : j + 1}</button>`).join("")}</div>
   </section>`;
@@ -326,19 +329,34 @@ function saveSheet() {
         start: L.r5(w.load * 1.1) || 10,
         text: `Every set moved easily (well under today's RPE ${b.rpe_cap} cap). Optional: climb in ${b.step_lb || 10}-lb jumps to ONE top set of 3–5 @ RPE 8 — crisp, never a grind — and the TM recalibrates from it (±15% max). Skip it and nothing changes.` };
     }
-    const nextLabel = nextUp();
+    const partner = pairTurn(b);
+    const nextLabel = partner ? setLabel(partner) : nextUp();
     if (nextLabel) startRest(res.restS, nextLabel);
+    save(); render();
+    scrollToCurrent(partner ? S.active.spec.blocks.indexOf(partner) : currentWorkIdx(b) >= 0 ? sh.b : null);
+    return;
   }
   save(); render();
   scrollToCurrent();
 }
+
+// Paired lifts (the press and the pull-up) alternate: the partner is up next while it has a
+// set left and isn't ahead. coach/session_spec.py sets `pair` and the shorter rest between them.
+function pairTurn(b) {
+  if (!b?.pair) return null;
+  const o = S.active.spec.blocks.find((x) => x.type === "lift" && x.id === b.pair);
+  if (!o || currentWorkIdx(o) < 0) return null;
+  const count = (x) => x.work.filter((w) => w.done || w.skipped).length;
+  return count(o) < count(b) ? o : null;
+}
+const setLabel = (b) => { const i = currentWorkIdx(b); return `${b.label}: ${L.loadText(b.work[i].load, b.load_mode)} × ${b.work[i].target_reps ?? b.work[i].reps}`; };
 
 // What's next in the session, for the rest bar.
 function nextUp() {
   for (const b of S.active.spec.blocks) {
     if (b.type === "lift") {
       const i = currentWorkIdx(b);
-      if (i >= 0) return `${b.label}: ${L.loadText(b.work[i].load, b.load_mode)} × ${b.work[i].target_reps ?? b.work[i].reps}`;
+      if (i >= 0) return setLabel(pairTurn(b) || b);
     } else if (b.type === "hold" && b.state.secs.some((x) => x == null)) return b.title;
     else if (b.type === "sets" && b.state.done.some((x) => !x)) return b.title;
     else if (b.type === "sequence" && !b.state.done) return b.title;
@@ -346,9 +364,9 @@ function nextUp() {
   return "Finish";
 }
 
-function scrollToCurrent() {
+function scrollToCurrent(bi = null) {
   requestAnimationFrame(() => {
-    const el = root.querySelector(".row.current");
+    const el = (bi != null && root.querySelector(`#blk${bi} .row.current`)) || root.querySelector(".row.current");
     if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
   });
 }

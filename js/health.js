@@ -45,9 +45,13 @@ export function weekCard() {
   if (!w) return "";
   const t = w.targets || {};
   const lo = (x) => (Array.isArray(x) ? x[0] : x);
+  // the targets are what THIS week schedules (coach/actuals.week_targets); nothing scheduled = a bonus
   const chip = (label, have, want, unit = "") => {
-    const ok = have != null && have >= lo(want);
-    return `<div class="hcell"><span class="muted small">${esc(label)}</span><b class="${ok ? "ok-text" : ""}">${esc(have ?? "—")}${esc(unit)}</b><span class="muted small">of ${esc(Array.isArray(want) ? want.join("–") : want)}${esc(unit)}</span></div>`;
+    const none = want == null || lo(want) === 0;
+    const ok = !none && have != null && have >= lo(want);
+    const of = none ? (have ? "a bonus" : "none planned")
+      : `of ${Array.isArray(want) && want[0] !== want[1] ? want.join("–") : lo(want)}${unit}`;
+    return `<div class="hcell"><span class="muted small">${esc(label)}</span><b class="${ok ? "ok-text" : ""}">${esc(have ?? "—")}${esc(unit)}</b><span class="muted small">${esc(of)}</span></div>`;
   };
   return `<section class="card"><div class="lift-head"><h2>This week so far</h2><span class="tm">from your watch · since ${esc(dayLabel(w.from, { short: true }))}</span></div>
     <div class="hgrid">

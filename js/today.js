@@ -10,6 +10,19 @@ import { timelineCard, nextOf, workCard } from "./day.js";
 import { suggestionsCard } from "./plan.js";
 import { freshBanner, healthCard, weekCard } from "./health.js";
 
+// A competition inside its window: what today is for (coach/program.py § Competition).
+function eventLine(d) {
+  const e = d?.event;
+  if (!e) return "";
+  const n = e.offset;
+  const what = n === 0 ? "today — nothing else on the plan"
+    : n === -1 ? "tomorrow — primer only, no hard rounds"
+    : n === -2 ? "in 2 days — no hard contact, nothing that leaves you sore"
+    : n < 0 ? `in ${-n} days — Nordics and Copenhagens are off until after`
+    : "was yesterday — an easy day";
+  return `<p class="adj"><b>${esc(e.name)}</b> ${esc(what)}.</p>`;
+}
+
 export function viewToday() {
   const p = S.plan;
   const f = fuel();
@@ -27,6 +40,7 @@ export function viewToday() {
       <div class="lift-head"><p class="muted">${esc([statusLine(d), sleep ? `${sleep}${r.sleep_source === "reported" ? " (you)" : ""}` : null, r.hrv_state ? `HRV ${r.hrv_state}` : null].filter(Boolean).join(" · "))}</p>
         <div class="btnpair"><button class="btn sm" data-a="asksheet">Ask</button><button class="btn sm" data-a="fixsheet">Fix</button></div></div>
       ${fixing.length ? `<p class="adj">Fix sent (${esc(fixing.map((o) => o.op === "report_sleep" ? `slept ${o.hours} h` : o.op === "schedule_override" ? `today is ${o.type.toLowerCase()}` : o.op === "neck_sore" ? "neck sore" : "neck fine").join(", "))}) — today rebuilds in about a minute.</p>` : ""}
+      ${eventLine(d)}
       ${(lv.why || []).map((w) => `<p class="adj">${esc(w)}</p>`).join("")}
       <p class="muted small">${lived.changes ? `With your ${lived.changes} change${lived.changes > 1 ? "s" : ""}: ≈${fmtNum(lived.kcal)} kcal · ${lived.protein} g protein` : "Eating to plan — log only what changes."}</p></section>`;
 

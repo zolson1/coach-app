@@ -8,7 +8,7 @@ import { timelineCard, nowMin } from "./day.js";
 import { hm } from "./timeline.js";
 
 const SESSION_NAME = { strength_a: "Strength A", strength_b: "Strength B", domain: "Domain Day", lic: "Zone 2",
-  loaded_mobility: "Loaded mobility", mobility_pm: "Mobility", rest: "Rest", hic: "VO2 4×4" };
+  loaded_mobility: "Loaded mobility", mobility_pm: "Mobility", rest: "Rest", hic: "VO2 4×4", primer: "Primer (optional)" };
 const SUPPS = [["creatine", "Creatine 5 g — breakfast"], ["omega3", "Omega-3, 2 softgels — dinner"], ["magnesium", "Magnesium glycinate — before bed"]];
 
 const selDate = () => (S.fuelDate && dayOf(S.fuelDate) ? S.fuelDate : today());

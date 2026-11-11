@@ -33,16 +33,18 @@ export function suggestions() {
     && !(s.until && (s.dates || []).includes(today()) && nowHM() >= s.until));
 }
 
-export function suggestionsCard() {
-  const list = suggestions();
+// `about`: "today" = only what touches today (it sits above the day), "later" = the rest (below it).
+export function suggestionsCard(about = null) {
+  const list = suggestions().filter((s) => !about || ((s.dates || []).includes(today()) ? "today" : "later") === about);
   if (!list.length) return "";
-  return `<section class="card"><h2>Looking ahead</h2>
+  return `<section class="card"><h2>${about === "today" ? "Worth deciding now" : "Looking ahead"}</h2>
     ${list.map((s) => `<div class="workrow"><p><b>${esc(s.title)}</b></p><p class="muted small">${esc(s.text)}</p>
       ${s.kind === "fuel" ? `<div class="toolrow">${s.ops?.length ? `<button class="btn sm primary" data-a="sugdo" data-id="${esc(s.id)}">Apply it</button>` : ""}
         <button class="btn sm ghost" data-a="tab" data-t="progress">The numbers</button>
         <button class="btn sm ghost" data-a="sugno" data-id="${esc(s.id)}">${s.ops?.length ? "Not now" : "Got it"}</button></div>`
       : s.ops?.length ? `<div class="toolrow"><button class="btn sm primary" data-a="sugdo" data-id="${esc(s.id)}">Do it</button>
-        <button class="btn sm ghost" data-a="plansheet" data-date="${esc(s.dates[0])}">Edit ${esc(short(s.dates[0]).replace(/^To(day|morrow)$/, (m) => m.toLowerCase()))}…</button>
+        ${s.kind === "class" ? `<button class="btn sm ghost" data-a="matpicksheet" data-date="${esc(s.dates[0])}">Classes…</button>`
+          : `<button class="btn sm ghost" data-a="plansheet" data-date="${esc(s.dates[0])}">Edit ${esc(short(s.dates[0]).replace(/^To(day|morrow)$/, (m) => m.toLowerCase()))}…</button>`}
         <button class="btn sm ghost" data-a="sugno" data-id="${esc(s.id)}">Not this time</button></div>`
       : `<div class="toolrow"><button class="btn sm" data-a="matpicksheet" data-date="${esc(s.dates[0])}">Classes…</button>
         <button class="btn sm ghost" data-a="weekview">The week</button>

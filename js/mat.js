@@ -53,6 +53,19 @@ export function mobilityCard(date = today()) {
     <p class="muted small">After class, a lift, or in the evening — not right before lifting, power work or sparring.</p></section>`;
 }
 
+// The same routine as one row, for Today's training card.
+export function mobilityRow(date = today()) {
+  const r = S.plan?.routines;
+  if (!r) return "";
+  const done = mobilityDone(date);
+  const hc = S.plan.hip_check;
+  const due = hc && r.hip_check && hc.due <= today();
+  return `<div class="mobrow"><p><b>${esc(r.mobility.title)}${done ? " ✓" : ""}</b><br><span class="muted small">${esc(r.mobility.subtitle)} · not right before lifting or sparring</span></p>
+      <div class="btnpair"><button class="btn sm ${done ? "" : "primary"}" data-a="open" data-k="mobility">${done ? "Again" : "Start"}</button>
+        <button class="btn sm" data-a="open" data-k="mobility_min">3 min</button></div></div>
+    ${due ? `<button class="btn" data-a="open" data-k="hip_check">Hip check — ${hc.last ? "due" : "take the first one"} (5 min)</button>` : ""}`;
+}
+
 // ------------------------------------------------------------- the mat screen
 export function viewMat() {
   const d = dayOf(S.viewArg) || dayOf(today());

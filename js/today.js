@@ -1,14 +1,15 @@
-// The Today tab: the one screen to open — what to eat next, what to train,
-// what the kitchen needs tonight, and whether anything wants attention.
+// The Today tab: the one screen to open — where the day stands, what's next, the day in
+// order, and the sessions to start. About a screen and a half (2026-11-10: it had grown to
+// three and a half; the week's scorecard and the body numbers moved to Progress).
 import { S, A, esc, fuel, send, today, fmtNum, pendingCount } from "./core.js";
-import { levelChip, dayOf, statusLine, tasksHTML, macroLine, LEVEL_NAME, companyControl, companyDetail } from "./ui.js";
+import { levelChip, dayOf, tasksHTML, macroLine, LEVEL_NAME, companyControl, companyDetail } from "./ui.js";
 import { dayTotals, nextRow, livedTotals } from "./ops.js";
 import { sessionButton } from "./train.js";
-import { matCard, mobilityCard } from "./mat.js";
+import { matCard, mobilityRow } from "./mat.js";
 import { fixPending } from "./fix.js";
-import { timelineCard, nextOf, workCard } from "./day.js";
+import { timelineCard, nextOf, workRows } from "./day.js";
 import { suggestionsCard } from "./plan.js";
-import { freshBanner, healthCard, weekCard } from "./health.js";
+import { freshBanner, weekStrip } from "./health.js";
 
 // A competition inside its window: what today is for (coach/program.py § Competition).
 function eventLine(d) {
@@ -33,19 +34,20 @@ export function viewToday() {
   if (d) {
     const lv = d.level, tot = dayTotals(d), lived = livedTotals(d);
     const r = t?.readiness || {};
-    const sleep = r.sleep_last_night_h != null ? `slept ${r.sleep_last_night_h} h` : null;
+    const hm = (h) => `${Math.floor(h)} h ${String(Math.round((h % 1) * 60)).padStart(2, "0")}`;
+    const sleep = r.sleep_last_night_h != null ? `slept ${hm(r.sleep_last_night_h)}` : null;
     const fixing = fixPending();
-    html += `<section class="card dayhead"><div class="lift-head"><h2>${esc(d.weekday)}</h2>${levelChip(lv.today, LEVEL_NAME[lv.today])}</div>
-      <p class="big-num">${fmtNum(lv.kcal)} <span>kcal</span> · ${lv.protein}+ <span>g protein</span></p>
-      <div class="lift-head"><p class="muted">${esc([statusLine(d), sleep ? `${sleep}${r.sleep_source === "reported" ? " (you)" : ""}` : null, r.hrv_state ? `HRV ${r.hrv_state}` : null].filter(Boolean).join(" · "))}</p>
+    html += `<section class="card dayhead"><div class="lift-head"><h2>${esc(d.weekday)} ${levelChip(lv.today, LEVEL_NAME[lv.today])}</h2>
         <div class="btnpair"><button class="btn sm" data-a="asksheet">Ask</button><button class="btn sm" data-a="fixsheet">Fix</button></div></div>
+      <p class="big-num">${fmtNum(lv.kcal)} <span>kcal</span> · ${lv.protein}+ <span>g protein</span></p>
+      <p class="muted">${esc([d.status, sleep ? `${sleep}${r.sleep_source === "reported" ? " (you)" : ""}` : null, r.hrv_state ? `HRV ${r.hrv_state}` : null, d.early_night ? "early night" : null].filter(Boolean).join(" · "))}</p>
       ${fixing.length ? `<p class="adj">Fix sent (${esc(fixing.map((o) => o.op === "report_sleep" ? `slept ${o.hours} h` : o.op === "schedule_override" ? `today is ${o.type.toLowerCase()}` : o.op === "neck_sore" ? "neck sore" : "neck fine").join(", "))}) — today rebuilds in about a minute.</p>` : ""}
       ${eventLine(d)}
       ${(lv.why || []).map((w) => `<p class="adj">${esc(w)}</p>`).join("")}
-      <p class="muted small">${lived.changes ? `With your ${lived.changes} change${lived.changes > 1 ? "s" : ""}: ≈${fmtNum(lived.kcal)} kcal · ${lived.protein} g protein` : "Eating to plan — log only what changes."}</p></section>`;
+      ${lived.changes ? `<p class="muted small">With your ${lived.changes} change${lived.changes > 1 ? "s" : ""}: ≈${fmtNum(lived.kcal)} kcal · ${lived.protein} g protein</p>` : ""}
+      ${workRows(d)}</section>`;
 
-    html += workCard(d);
-    html += suggestionsCard();
+    html += suggestionsCard("today");
     const now = new Date();
     const dinner = d.card.rows.find((r) => r.slot === "dinner" && r.company && !d.log?.[r.slot]);
     const nx = nextOf(d);
@@ -71,10 +73,10 @@ export function viewToday() {
           ${guide ? `<p class="muted small">e.g. ${esc(row.what)}</p>` : ""}<p class="muted">${esc(macroLine(i.eff ? { ...i.eff, kcal: Math.round(i.eff.kcal) } : i))}</p>
           ${notes.map((n) => `<p class="adj">${esc(n)}</p>`).join("")}${companyDetail(row)}
           <div class="two"><button class="btn" data-a="devsheet" data-date="${d.date}" data-slot="${esc(i.slot)}">Ate something else</button>
-            <button class="btn ghost" data-a="rowsheet" data-date="${d.date}" data-slot="${esc(i.slot)}">Different time / skipped</button></div>
+            <button class="btn ghost" data-a="rowsheet" data-date="${d.date}" data-slot="${esc(i.slot)}">Moved / skipped</button></div>
           ${dinner ? companyControl(d, dinner, dinnerAt) + (dinner.slot === i.slot ? "" : companyDetail(dinner)) : ""}</section>`;
       }
-      html += timelineCard(d);
+      html += timelineCard(d, { fold: true });
     } else {
     const next = nextRow(d, now.getHours() * 60 + now.getMinutes());
     html += next ? `<section class="card next"><span class="eyebrow">Next · ${esc(next.time)}</span>
@@ -92,17 +94,20 @@ export function viewToday() {
   const sessions = p?.sessions || {};
   const runnable = (t?.sessions || []).filter((k) => sessions[k]);
   html += matCard(d);
+  const lic = (d?.sessions || t?.sessions || []).includes("lic");
+  const nothing = !d?.mat_plan && !runnable.length && !lic && !(d?.activities || []).length;
   html += `<section class="card"><div class="lift-head"><h2>Training</h2><div class="btnpair"><button class="btn sm" data-a="weekview">Week</button><button class="btn sm ghost" data-a="plansheet" data-date="${today()}">Edit today</button></div></div>
     ${(d?.activities || []).map((a) => `<button class="notice" data-a="actsheet" data-date="${today()}" data-id="${esc(a.id)}"><b>${esc(a.name)}</b> · ${esc(a.start || "set a time")}${a.dur ? `, ${a.dur} min` : ""} <span class="muted">· ${esc(a.intensity === "hard" ? "a hard session" : "counts as Zone 2")}</span></button>`).join("")}
     ${d?.covered ? `<p class="line">Zone 2 — covered by ${esc(d.covered.lic)}; no separate LIC.</p>` : ""}
     ${d?.plan_pending ? `<p class="muted small">Plan change saved — today rebuilds in about a minute.</p>` : ""}
     ${S.active ? `<button class="btn primary big" data-a="resume">Resume ${esc(S.active.spec.title)}</button>` : ""}
     ${runnable.map((k) => sessionButton(sessions[k], true)).join("")}
-    ${(d?.sessions || t?.sessions || []).includes("lic") ? `<p class="line">Zone 2, 45–60 min.</p>` : ""}
-    ${!d?.mat_plan && !runnable.length && !(d?.sessions || t?.sessions || []).includes("lic") && !(d?.activities || []).length ? `<p class="muted">Nothing scheduled${t ? "" : " — today's plan arrives with the morning run"}.</p>` : ""}
-    ${t?.deviation ? `<p class="warn-text">${esc(t.deviation)}</p>` : ""}</section>`;
-  html += mobilityCard();
-  html += weekCard() + healthCard();
+    ${lic ? `<p class="line">Zone 2, 45–60 min.</p>` : ""}
+    ${nothing ? `<p class="muted">No session scheduled${t ? "" : " — today's plan arrives with the morning run"}.</p>` : ""}
+    ${t?.deviation ? `<p class="warn-text">${esc(t.deviation)}</p>` : ""}
+    ${mobilityRow()}</section>`;
+  html += weekStrip();
+  html += suggestionsCard("later");
 
   if (d) {
     const tasks = tasksHTML(d);
@@ -117,8 +122,6 @@ export function viewToday() {
     if (notes.length) html += `<section class="card"><h2>Worth a look</h2>${notes.join("")}</section>`;
   }
 
-  html += `<div class="toolrow"><button class="btn sm" data-a="devsheet" data-date="${today()}">Ate something else</button>
-    <button class="btn sm" data-a="weightsheet">Weigh-in</button><button class="btn sm" data-a="waistsheet">Waist</button></div>`;
   const n = pendingCount();
   if (n) html += `<p class="muted small center">${n} change${n > 1 ? "s" : ""} syncing to the coach…</p>`;
   return html;

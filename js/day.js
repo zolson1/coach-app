@@ -56,7 +56,27 @@ function tlRow(d, i) {
     <span class="tl-s">${st}</span></${Tag}>`;
 }
 
-export function timelineCard(d, { title = "Your day", open = true } = {}) {
+// On Today, what's already behind him folds into one line so the list starts at "now"
+// (a shift day's ten rows were most of a screen by mid-afternoon). Three or more, or it isn't worth a tap.
+const BEHIND = new Set(["done", "past", "skipped", "fold"]);
+function foldEarlier(d, items) {
+  const cut = items.findIndex((i) => i.next);
+  const behind = cut > 0 ? items.slice(0, cut).filter((i) => BEHIND.has(i.status)) : [];
+  if (behind.length < 3) return items.map((i) => tlRow(d, i)).join("");
+  const set = new Set(behind);
+  const skipped = behind.filter((i) => i.status === "skipped").length;
+  let out = "", placed = false;
+  for (const i of items) {
+    if (!set.has(i)) { out += tlRow(d, i); continue; }
+    if (placed) continue;
+    placed = true;
+    out += `<details class="tl-earlier"><summary>Earlier today · ${behind.length - skipped} done${skipped ? `, ${skipped} skipped` : ""}</summary>
+      <div class="tl">${behind.map((x) => tlRow(d, x)).join("")}</div></details>`;
+  }
+  return out;
+}
+
+export function timelineCard(d, { title = "Your day", open = true, fold = false } = {}) {
   const L = live(d);
   if (!L) return "";
   const b = L.balance;
@@ -65,7 +85,8 @@ export function timelineCard(d, { title = "Your day", open = true } = {}) {
     head = `<p class="adj">So far ≈${fmtNum(Math.round(b.eaten.kcal))} kcal · ${Math.round(b.eaten.protein)} g protein (${signed(b.dev.kcal)} kcal vs the card). `
       + (b.adjustments.length ? "The rest of today is adjusted below." : esc(b.lines?.[0] || "Nothing to change — back on the card at the next meal.")) + `</p>`;
   }
-  const rows = L.items.filter((i) => i.kind !== "cue" || i.slot === "overnight" || i.activity).map((i) => tlRow(d, i)).join("");
+  const shown = L.items.filter((i) => i.kind !== "cue" || i.slot === "overnight" || i.activity);
+  const rows = fold && d.when === "today" ? foldEarlier(d, shown) : shown.map((i) => tlRow(d, i)).join("");
   const extras = L.untimed.filter((i) => i.extra).map((i) => `<p class="muted small">➕ ${esc(i.label)} — ${fmtNum(i.eff.kcal)} kcal (no time logged)</p>`).join("");
   const body = `${head}<div class="tl">${rows}</div>${extras}
     ${(d.timeline.notes || []).map((n) => `<p class="muted small">${esc(n)}</p>`).join("")}
@@ -94,7 +115,7 @@ function blockOf(d, date) {
 
 // Today's work, if any: the block that started today, the one being relieved today,
 // or tomorrow's report (which sets tonight's lights out).
-export function workCard(d) {
+function workRowList(d) {
   const w = d?.work || {};
   const now = nowMin();
   const rows = [];
@@ -124,8 +145,11 @@ export function workCard(d) {
       <div class="toolrow"><button class="btn sm ghost" data-a="leavesheet" data-date="${d.date}">Change</button></div></div>`);
   }
   if (d.leave_pending) rows.push(`<p class="muted small">Leave saved — the plan rebuilds in about a minute.</p>`);
-  return rows.length ? `<section class="card"><h2>Work</h2>${rows.join("")}</section>` : "";
+  return rows;
 }
+
+// Today folds these rows into its header.
+export const workRows = (d) => workRowList(d).join("");
 
 SHEETS.work = (sh) => {
   const d = dayOf(sh.day);

@@ -9,8 +9,11 @@ const fuelDay = (iso) => fuel()?.days.find((d) => d.date === iso) || null;
 export function label(lift) {
   const map = { trap_bar_deadlift: "Trap-bar DL", front_squat: "Front squat", high_bar_squat: "High-bar squat",
     zercher_squat: "Zercher", overhead_press: "OHP", push_press: "Push press", incline_or_landmine_press: "Incline/landmine",
-    weighted_pullup: "Pull-up (total)", rack_pull: "Rack pull", power_clean: "Power clean" };
-  return map[lift] || lift;
+    weighted_pullup: "Pull-up (total)", rack_pull: "Rack pull", power_clean: "Power clean",
+    sumo_deadlift: "Sumo DL", barbell_row: "Barbell row", pendlay_row: "Pendlay row", bench_press: "Bench press",
+    landmine_push_press: "Landmine push press", ssb_squat: "Safety-bar squat" };
+  // an unknown key still reads as words, never as a variable name
+  return map[lift] || String(lift).replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 }
 
 function doneThisWeek(key) {

@@ -1,7 +1,7 @@
 // What the wearables say, with nothing to log (Zach, 2026-10-24: "the app should
 // automatically draw my health metrics and workouts … I'm only logging deviations").
 //  · a banner when a feed the plan leans on has gone stale (coach/actuals.py freshness)
-//  · the body: last night's sleep, HRV, resting HR, weight, waist
+//  · the body: last night's sleep, HRV and resting HR (weight and waist sit with the food numbers)
 //  · the week so far against its targets, from the watch
 import { S, esc } from "./core.js";
 import { dayLabel } from "./ui.js";
@@ -24,20 +24,32 @@ export function freshBanner() {
 export function healthCard() {
   const h = S.plan?.health;
   if (!h) return "";
-  const s = h.sleep || {}, v = h.hrv || {}, r = h.rhr || {}, w = h.weight || {};
+  const s = h.sleep || {}, v = h.hrv || {}, r = h.rhr || {};
   const lastSleep = s.last ? s.last[1] : null;
   const short = lastSleep != null && lastSleep < 7;
+  const flags = S.plan?.fuel?.review?.recovery?.flags || [];
   const cell = (label, big, sub, warn) => `<div class="hcell"><span class="muted small">${esc(label)}</span><b class="${warn ? "warn-text" : ""}">${esc(big)}</b><span class="muted small">${esc(sub)}</span></div>`;
-  return `<section class="card"><div class="lift-head"><h2>Body</h2><span class="tm">from Oura · Garmin · scale</span></div>
-    <div class="hgrid">
+  return `<section class="card"><div class="lift-head"><h2>Body</h2><span class="tm">last night · from Oura and Garmin</span></div>
+    <div class="hgrid three">
       ${cell("Sleep", hours(lastSleep), `7-day ${hours(s.avg7)}`, short)}
       ${cell("HRV", v.last ? `${v.last[1]} ms` : "—", v.avg7 ? `7-day ${v.avg7}` : "", false)}
       ${cell("Resting HR", r.last ? `${r.last[1]}` : "—", r.avg7 ? `7-day ${r.avg7}` : "", false)}
-      ${cell("Weight", w.avg7 ? `≈${w.avg7} lb` : "—", w.last ? `weighed ${when(w.last[0])}` : "no weigh-ins", false)}
     </div>
-    ${h.waist ? `<p class="muted small">Waist ${esc(h.waist.inches)}" (${esc(when(h.waist.date))}) — the target is under 36".</p>` : ""}
-    ${(() => { const c = S.plan?.fuel?.review?.verdict?.check; return c ? `<p class="muted small">Calorie check since ${esc(dayLabel(c.since, { short: true }))}: ${c.weighins} of ${c.need} weigh-ins, ${c.span} of ${c.need_span} days — the verdict lands here and in Looking ahead.</p>` : ""; })()}
+    ${flags.length ? `<p class="adj">${esc(flags.join(" · "))}</p>` : ""}
   </section>`;
+}
+
+// Today carries one line of the week; the card, the body numbers and the trends live on Progress.
+export function weekStrip() {
+  const w = S.plan?.week_actual;
+  if (!w) return "";
+  const t = w.targets || {};
+  const lo = (x) => (Array.isArray(x) ? x[0] : x);
+  const bit = (label, have, want) => (want == null || lo(want) === 0 ? null : `${label} ${have ?? 0} of ${lo(want)}`);
+  const bits = [bit("mat", w.mat_sessions, t.mat_sessions), bit("lifts", w.lifts, t.lifts), bit("4×4", w.vo2, t.vo2),
+    w.sleep_avg != null ? `sleep ${w.sleep_avg} h` : null].filter(Boolean);
+  if (!bits.length) return "";
+  return `<button class="notice strip" data-a="tab" data-t="progress"><span class="eyebrow">This week</span> ${esc(bits.join(" · "))} <span class="muted">›</span></button>`;
 }
 
 export function weekCard() {
